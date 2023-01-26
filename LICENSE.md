@@ -30,5 +30,5 @@ In no event shall WMMEDIA or its suppliers be liable for any damages whatsoever 
 
 Should you have any questions concerning License, 
 or if you desire to contact the WMMEDIA for any reason, 
-please contact to: wmm@wmmedia.com, +48 502 178-860, skype: wmmedia
+please contact to: embercad@wmmedia.com, +48 502 178-860
 
