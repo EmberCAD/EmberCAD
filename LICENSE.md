@@ -18,7 +18,8 @@ The SOFTWARE is owned by WMMEDIA and is protected by Polish copyright laws and i
 3. OTHER RESTRICTIONS
 You may not rent, lease or loan the SOFTWARE, but may transfer the SOFTWARE and accompanying written materials and data on a permanent basis provided no copies are retained by the licensee and the recipient agrees to abide by the terms of this agreement. You may not reverse engineer, decompile or disassemble the SOFTWARE.
 
-LIMITED WARRANTY
+4. LIMITED WARRANTY
+
 WMMEDIA warrants that the SOFTWARE will perform substantially in accordance with the accompanying written material for a period of 60 days from the date of receipt.
 
 WMMEDIA and its suppliers entire liability and your exclusive remedy shall be at WMMEDIA's discretion either (a) return of the price paid, less transport costs if any or other agreed conditions (b) repair or replacement of the SOFTWARE that does not meet WMMEDIA's limited warranty and which is returned to WMMEDIA with your receipt of purchase. This limited warranty is void if failure of the SOFTWARE results from accident, abuse or misapplication.
