@@ -26,7 +26,7 @@ WMMEDIA and its suppliers entire liability and your exclusive remedy shall be at
 
 WMMEDIA and its suppliers disclaim all other warranties either expressed or implied, including but not limited to implied warranties of merchantability and fitness for a particular purpose with respect to the SOFTWARE, the accompanying written materials and any accompanying data.
 
-In no event shall WMMEDIA or its suppliers be liable for any damages whatsoever (including without limitation, damages for loss of business profits, business interruption, loss of business information or any other pecuniary loss) arising from the use or inability to use this EmberCAD Personal product, even if WMMEDIA has been advised of the possibility of such damages. in any case WMMEDIA's entire liability under the provisions of this agreement shall be limited to the purchase price paid for the SOFTWARE.
+In no event shall WMMEDIA or its suppliers be liable for any damages whatsoever (including without limitation, damages for loss of business profits, business interruption, loss of business information or any other pecuniary loss) arising from the use or inability to use this EmberCAD Personal product, even if WMMEDIA has been advised of the possibility of such damages.
 
 
 Should you have any questions concerning License, 
