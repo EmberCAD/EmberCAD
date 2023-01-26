@@ -12,3 +12,12 @@ Please post any bugs or spotting in the [Issues](https://github.com/EmberCAD/Eme
 ## Download
 
 Download for PC, Mac and Linux is available in the [Releases](https://github.com/EmberCAD/EmberCAD-Beta/releases) section
+
+
+## About
+
+EmberCAD is software that allows you to design or import illustrations in SVG, DXF, PDF, JPG or PNG format, and control the laser for cutting and engraving.
+
+## Author
+
+Gregory R. Wróblewski - http://redsparrow.eu
