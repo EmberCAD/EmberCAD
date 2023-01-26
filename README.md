@@ -22,7 +22,9 @@ EmberCAD is software that allows you to design or import illustrations in SVG, D
 
 Grzegorz R. Wróblewski
 
-Wesprzyj rozwój aplikacji i zostań Patronem!
+---
+
+Support the development of the application and become a Patron!
 
 
 [Patreon](https://www.patreon.com/EmberCAD)
