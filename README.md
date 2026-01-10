@@ -41,4 +41,4 @@ By downloading the application or participating in its development, you agree to
 ---
 
 Author: Grzegorz R. Wróblewski  
-Support the project: [Patreon](https://www.patreon.com/EmberCAD)
+Support the project: [Patreon](https://www.patreon.com/c/EmberCAD)
