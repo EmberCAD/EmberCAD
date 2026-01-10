@@ -7,7 +7,17 @@ EmberCAD is a functional Alpha software designed to bridge the gap between desig
 The program is fully operational but is currently in its Alpha stage.
 
 * Codebase: The project has developed organically. Priority was given to functionality and laser control precision, which resulted in technical debt. The code does not yet follow Clean Code principles.
-* Open Source Model: I am releasing this project as Open Source because I believe in its utility. If you are a developer and see areas for refactoring or optimization, your Pull Requests are welcome. We can organize this codebase together.
+* Source Available Model: I am sharing the source code to build a community and improve the tool. If you are a developer and see areas for refactoring or optimization, your Pull Requests are welcome.
+
+## Important: Intellectual Property and Licensing
+
+Please note that while the source code is public, the licensing is restrictive regarding commercial use:
+
+* End User License: This software is provided for personal and professional use by end users.
+* No Commercial Redistribution: You are not allowed to create derivative versions, rebrand the software, or bundle it with hardware (OEM) for sale without a specific commercial agreement.
+* Copyright: All rights to the EmberCAD brand and its original architecture remain with the author. 
+
+For commercial inquiries or licensing for laser manufacturers, please contact the author directly.
 
 ## About
 
@@ -26,7 +36,7 @@ Contributions from both users and developers are essential for the project's gro
 
 ## License
 
-By downloading the application or participating in its development, you agree to the license terms contained in the [LICENSE.md](https://github.com/EmberCAD/EmerCAD-Beta/blob/main/LICENSE.md) file.
+By downloading the application or participating in its development, you agree to the terms contained in the [LICENSE.md](https://github.com/EmberCAD/EmerCAD-Beta/blob/main/LICENSE.md) file.
 
 ---
 
