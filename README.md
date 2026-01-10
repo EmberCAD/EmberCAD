@@ -1,34 +1,34 @@
 # EmberCAD - Alpha Version
 
-By downloading this application you agree to be bound by the license terms contained in the [LICENSE.md](https://github.com/EmberCAD/EmerCAD-Beta/blob/main/LICENSE.md) file.
+EmberCAD is a functional Alpha software designed to bridge the gap between design and laser execution.
 
-</br>
+## Project Status and Alpha Phase
 
-## Issue, bugs and feature requests
+The program is fully operational but is currently in its Alpha stage.
 
-Please post any bugs or spotting in the [Issues](https://github.com/EmberCAD/EmerCAD-Beta/issues) section.
-
-</br>
-
-## Download
-
-Download for PC, Mac and Linux is available in the [Releases](https://github.com/EmberCAD/EmberCAD-Beta/releases) section
-
-</br>
+* Codebase: The project has developed organically. Priority was given to functionality and laser control precision, which resulted in technical debt. The code does not yet follow Clean Code principles.
+* Open Source Model: I am releasing this project as Open Source because I believe in its utility. If you are a developer and see areas for refactoring or optimization, your Pull Requests are welcome. We can organize this codebase together.
 
 ## About
 
-EmberCAD is software that allows you to design or import illustrations in SVG, DXF, PDF, JPG or PNG format, and control the laser for cutting and engraving.
-</br>
+EmberCAD allows you to design or import illustrations in SVG, DXF, PDF, JPG, or PNG formats, and provides precise control over laser cutting and engraving processes.
 
-## Author
+## Download
 
-Grzegorz R. Wróblewski
-</br>
+Pre-compiled binaries for Windows, Mac, and Linux are available in the [Releases](https://github.com/EmberCAD/EmberCAD-Beta/releases) section.
+
+## Collaboration
+
+Contributions from both users and developers are essential for the project's growth:
+* Bug Reporting: Please report any issues or bugs in the [Issues](https://github.com/EmberCAD/EmerCAD-Beta/issues) section.
+* Feature Requests: If you have ideas for new tools, please describe them in the issues section.
+* Code Quality: I invite you to submit PRs that will help transition this project from Alpha to a structured codebase.
+
+## License
+
+By downloading the application or participating in its development, you agree to the license terms contained in the [LICENSE.md](https://github.com/EmberCAD/EmerCAD-Beta/blob/main/LICENSE.md) file.
 
 ---
 
-Support the development of the application and become a Patron!
-
-
-[Patreon](https://www.patreon.com/EmberCAD)
+Author: Grzegorz R. Wróblewski  
+Support the project: [Patreon](https://www.patreon.com/EmberCAD)
