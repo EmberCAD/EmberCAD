@@ -1,0 +1,50 @@
+:root {
+  --treeview-bg-color: var(--cherry-background-default);
+  --treeview-bg-selected: var(--cherry-secondary-main);
+}
+
+.ch-treeView {
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background-color: var(--treeview-bg-color) !important;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.ch-treeView i {
+  pointer-events: none;
+}
+
+.ch-treeView-item-selected {
+  background-color: var(--treeview-bg-selected) !important;
+  align-items: center;
+}
+
+.ch-treeView-item {
+  align-items: center;
+  opacity: var(--cherry-opacity-default) !important;
+  border-bottom: 1px solid var(--cherry-background-handle);
+}
+
+.ch-treeView-item[top] {
+  border-top: 4px solid var(--cherry-secondary-main);
+}
+.ch-treeView-item[bottom] {
+  border-bottom: 4px solid var(--cherry-secondary-main);
+}
+.ch-treeView-item[on] {
+  border: 4px solid var(--cherry-secondary-main);
+}
+
+.ch-treeView-item:hover {
+  background-color: var(--cherry-background-paper) !important;
+
+  opacity: 1 !important;
+}
+
+.ch-treeView-item-selected:hover {
+  background-color: var(--treeview-bg-selected) !important;
+
+  opacity: 1 !important;
+}

@@ -1,0 +1,41 @@
+:root {
+  --button-border: 1px solid var(--cherry-text-secondary);
+  --button-bg-active: var(--cherry-theme-on-surface);
+  --button-border-color-focus: var(--cherry-primary-main);
+}
+
+button.ch-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: inherit;
+  outline: none;
+  border: var(--button-border);
+  color: inherit;
+  border-radius: var(--cherry-shape-borderRadius);
+  font-family: inherit;
+  opacity: var(--cherry-opacity-default);
+}
+
+.ch-button:active {
+  background-color: var(--button-bg-active);
+}
+
+.ch-button:disabled {
+  opacity: 0.3;
+}
+
+.ch-button:hover:enabled {
+  opacity: 1;
+}
+
+.ch-button:focus {
+  border-color: var(--button-border-color-focus);
+  opacity: 0.7;
+}
+
+.ch-button:hover:focus {
+  border-color: var(--button-border-color-focus);
+
+  opacity: 1;
+}

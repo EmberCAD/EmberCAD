@@ -1,0 +1,32 @@
+:root {
+  --splitter-bg-color: var(--cherry-background-handle);
+}
+
+.split {
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.gutter {
+  background-color: var(--splitter-bg-color) !important;
+  background-repeat: no-repeat;
+  background-position: 50%;
+  min-height: 1px;
+  min-width: 1px;
+}
+
+.gutter.gutter-horizontal {
+  cursor: col-resize;
+  z-index: 500;
+}
+
+.gutter.gutter-vertical {
+  cursor: row-resize;
+  z-index: 500;
+}
+
+.split.split-horizontal,
+.gutter.gutter-horizontal {
+  float: left;
+}

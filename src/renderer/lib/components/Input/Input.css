@@ -1,0 +1,39 @@
+:root {
+  --input-border-radius: var(--cherry-shape-borderRadius);
+  --input-border-color: var(--cherry-text-secondary);
+  --input-border-bottom-color: #383842;
+  --input-cont-bg-color: var(--cherry-background-default);
+  --input-bg-color: #1a1a1c;
+  --input-color: var(--cherry-text-secondary);
+  --input-placeholder-color: var(--cherry-text-hint);
+}
+
+.ch-inputCont {
+  border-radius: var(--input-border-radius);
+  background: var(--input-cont-bg-color);
+}
+
+.ch-input {
+  width: 100%;
+  padding-left: 0.5rem;
+  font-size: 1em;
+  font-family: inherit;
+  border: none;
+  border-bottom: 1px solid var(--input-border-bottom-color);
+  box-sizing: border-box;
+  text-decoration: none;
+  color: var(--input-color);
+  outline: none;
+  border-radius: var(--input-border-radius);
+  background-color: var(--input-bg-color);
+}
+
+.ch-input[readonly] {
+  cursor: default;
+}
+
+.ch-input::placeholder {
+  color: var(--input-placeholder-color);
+  opacity: 0.5;
+  font-style: italic;
+}

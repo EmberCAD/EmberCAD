@@ -1,0 +1,42 @@
+# Dependencies
+node_modules
+
+# Production build artifacts
+dist/
+build/
+bundle/
+
+# Local development config and secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Editor directories and files
+.vscode/
+.idea/
+.gemini/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+@design/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Testing
+coverage/

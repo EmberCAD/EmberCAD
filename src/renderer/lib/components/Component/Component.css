@@ -1,0 +1,43 @@
+.ch-component {
+  display: flex;
+  flex: none;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
+  line-height: normal;
+}
+
+.ch-alNone {
+}
+
+.ch-alClient {
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.ch-alTop {
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+}
+
+.ch-alRight {
+  top: 0 !important;
+  right: 0 !important;
+  height: 100% !important;
+}
+
+.ch-alBottom {
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+}
+
+.ch-alLeft {
+  top: 0 !important;
+  left: 0 !important;
+  height: 100% !important;
+}

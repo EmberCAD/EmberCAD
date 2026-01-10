@@ -1,0 +1,8 @@
+:root {
+  --app-font-family: Roboto;
+  --app-font-size: 14px;
+  --app-font-color: var(--cherry-text-secondary);
+
+  --active-border-color: var(--cherry-text-secondary);
+  --active-border-color-hover: var(--cherry-text-primary);
+}

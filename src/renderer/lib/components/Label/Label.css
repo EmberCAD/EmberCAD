@@ -1,0 +1,9 @@
+:root {
+  --label-border-radius: var(--cherry-shape-borderRadius);
+}
+
+.ch-label {
+  align-items: center;
+  border-radius: var(--label-border-radius);
+  line-height: normal;
+}

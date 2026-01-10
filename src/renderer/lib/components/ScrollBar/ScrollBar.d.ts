@@ -1,0 +1,50 @@
+export = ScrollBar;
+declare class ScrollBar {
+    constructor(id: any);
+    _init(): void;
+    customProps: string[];
+    baseClass: string;
+    handle: any;
+    _events(): void;
+    mouseDown: boolean;
+    rectH: any;
+    initOff: {
+        x: number;
+        y: number;
+    };
+    defaults(): void;
+    set width(arg: any);
+    get width(): any;
+    set height(arg: any);
+    get height(): any;
+    set min(arg: any);
+    get min(): any;
+    set max(arg: any);
+    get max(): any;
+    set amount(arg: any);
+    get amount(): any;
+    set value(arg: number);
+    get value(): number;
+    set visibles(arg: any);
+    get visibles(): any;
+    set orientation(arg: any);
+    get orientation(): any;
+    offset: {
+        x: number;
+        y: number;
+    };
+    set incremental(arg: any);
+    get incremental(): any;
+    enabled: boolean;
+    setPosition(e: any): void;
+    update(): void;
+    scale: number;
+    set handleColor(arg: any);
+    get handleColor(): any;
+    set radius(arg: any);
+    set design(arg: any);
+    get design(): any;
+    _design: any;
+    designClass: string;
+    onChangeCB(): void;
+}

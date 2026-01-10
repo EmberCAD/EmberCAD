@@ -1,0 +1,38 @@
+{
+  "name": "Light",
+  "background": "#efefef",
+  "areaFrame": {
+    "strokeWidth": 1,
+    "strokeColor": "#0009"
+  },
+  "laserCircle": {
+    "strokeWidth": 1,
+    "strokeColor": "#000"
+  },
+  "grid": {
+    "strokeColor": "#0002",
+    "thinLine": {
+      "strokeWidth": 1
+    },
+    "boldLine": {
+      "strokeWidth": 2
+    }
+  },
+  "select": "#88f",
+
+  "scale": {
+    "font": "14px helvetica",
+    "fillStyle": "#000a",
+    "strokeColor": "#000f",
+    "mainLine": {
+      "strokeColor": "#000c"
+    },
+    "auxLine": {
+      "strokeColor": "#0005"
+    }
+  },
+  "object": {
+    "strokeColor": "#000"
+  },
+  "key": "light"
+}

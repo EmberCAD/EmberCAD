@@ -1,0 +1,31 @@
+.ch-select {
+  justify-content: center;
+  align-items: center;
+  width: 2rem !important;
+  opacity: 0.8;
+}
+
+.ch-select:hover {
+  opacity: 1;
+}
+
+.ch-itemCont {
+  display: none;
+  position: absolute;
+  z-index: 501;
+  width: auto;
+  min-height: 2rem;
+  max-height: 30rem;
+  overflow-y: auto;
+  background: var(--cherry-background-default);
+  border-radius: 2px;
+  box-shadow: var(--cherry-shadow-outer);
+}
+
+.ch-selectItem {
+  padding: 0.25rem 1rem;
+}
+
+.ch-selectItem:hover {
+  background-color: var(--cherry-background-paper);
+}

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
+    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+    <title>Parcel Sandbox</title>
+    <meta charset="UTF-8" />
+  </head>
+
+  <body>
+    <div id="app"></div>
+      <py-config>
+              packages = [
+                "affine>=2.0",
+'markdown',
+'setuptools',
+'sphinx',
+'shapely>=1.8.2'
+              ]
+            </py-config>
+    <py-script>
+from __future__ import annotations
+
+import datetime
+import math
+from typing import Any
+from xml.etree import ElementTree as ET
+
+from affine import Affine    
+
+from boxes.extents import Extents
+    </py-script>
+  </body>
+</html>

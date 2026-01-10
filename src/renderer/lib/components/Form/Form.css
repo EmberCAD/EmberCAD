@@ -1,0 +1,17 @@
+:root {
+  --form-bg-color: var(--cherry-background-form);
+  --form-bg-hover-color: var(--cherry-background-default);
+}
+
+.ch-form {
+  display: flex;
+  position: relative;
+  flex: none;
+  flex-flow: wrap;
+  align-content: flex-start;
+  width: 100%;
+  height: calc(100vh - (var(--app-title-bar-height) + var(--app-menu-height)));
+  line-height: 1.2rem;
+  background: var(--form-bg-color);
+  overflow: hidden;
+}

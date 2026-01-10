@@ -1,0 +1,92 @@
+:root {
+  --mmenu-background-color: var(--cherry-menu-background);
+  --mmenu-border-color: var(--cherry-menu-border);
+  --mmenu-border-bottom-left-radius: 3px;
+  --mmenu-border-bottom-right-radius: 3px;
+
+  --mmenu-hover-bg-color: var(--cherry-menu-border);
+  --mmenu-separator-bg-color: var(--cherry-menu-border);
+}
+
+.ch-MainMenu {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 1.5rem;
+  min-height: 1.5rem;
+  background-color: var(--mmenu-background-color);
+  align-items: center;
+  opacity: 0.7;
+}
+
+.ch-menuCont {
+  display: none;
+  position: absolute;
+  flex-flow: column;
+  background-color: var(--mmenu-background-color);
+  border: 1px solid var(--mmenu-border-color);
+  box-sizing: border-box;
+  border-bottom-left-radius: var(--mmenu-border-bottom-left-radius);
+  border-bottom-right-radius: var(--mmenu-border-bottom-right-radius);
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  box-shadow: var(--cherry-shadow-outer);
+  z-index: 999999;
+}
+
+.ch-menuItem {
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  padding-right: 10px;
+  min-height: 18px;
+  height: 100%;
+  line-height: 1.5rem;
+  white-space: nowrap;
+}
+
+.ch-menuItem[disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.ch-menuItem[selected] {
+  pointer-events: none;
+  background-color: var(--mmenu-hover-bg-color);
+}
+
+.ch-menuItemAcc {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  pointer-events: none;
+}
+
+.ch-menuItem:hover:not([disabled]) {
+  background-color: var(--mmenu-hover-bg-color);
+}
+
+.ch-menuItemSeparatorLine {
+  border: 0;
+  height: 1px;
+  background-color: var(--mmenu-separator-bg-color);
+  pointer-events: none;
+}
+
+.ch-mmenuAcc {
+  padding-left: 40px;
+  pointer-events: none;
+}
+
+.ch-mmenuChecked,
+.ch-mmenuKey {
+  display: inline-block;
+  min-width: 10px;
+  pointer-events: none;
+}
+
+.ch-mmenuLabel {
+  pointer-events: none;
+}

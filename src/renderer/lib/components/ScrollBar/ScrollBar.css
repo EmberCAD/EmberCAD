@@ -1,0 +1,21 @@
+:root {
+  --scrollbar-bg-color: var(--cherry-scrollBar-background);
+  --scrollbar-handle-bg-color: var(--cherry-scrollBar-handle);
+  --scrollbar-handle-border-radius: var(--cherry-scrollBar-borderRadius);
+}
+
+.ch-scrollBar {
+  background-color: var(--scrollbar-bg-color);
+}
+
+.ch-scrollBarHandle {
+  position: absolute;
+  align-items: center;
+  justify-content: center;
+  display: flex;
+  flex: none;
+  border-radius: var(--scrollbar-handle-border-radius);
+  background-color: var(--scrollbar-handle-bg-color);
+  width: 100%;
+  height: 100%;
+}

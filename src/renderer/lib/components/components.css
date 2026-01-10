@@ -1,0 +1,66 @@
+@import './Application/Application.css';
+@import './ContextMenu/ContextMenu.css';
+@import './MainMenu/MainMenuT.css';
+@import './TitleBar/TitleBar.css';
+@import './Form/Form.css';
+@import './Component/Component.css';
+@import './Label/Label.css';
+@import './Panel/Panel.css';
+@import './WebView/WebView.css';
+@import './Input/Input.css';
+@import './Splitter/Splitter.css';
+@import './Select/Select.css';
+@import './Tabs/Tabs.css';
+@import './ScrollBar/ScrollBar.css';
+@import './Button/Button.css';
+@import './Memo/Memo.css';
+@import './Picture/Picture.css';
+@import './Hint/Hint.css';
+@import './CheckBox/CheckBox.css';
+@import './OptionApp/OptionApp.css';
+@import './ListView/ListView.css';
+@import './TreeView/TreeView.css';
+
+.ch-eventsDisabled {
+  pointer-events: none;
+}
+
+.ch-eventsEnabled {
+  pointer-events: all;
+}
+
+.ch-flex100 {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* -------------------------------------------- */
+::-webkit-scrollbar {
+  width: var(--cherry-scrollBar-size);
+  height: var(--cherry-scrollBar-size);
+  background: var(--cherry-scrollBar-background) !important;
+}
+
+::-webkit-scrollbar-track-piece:start {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-track-piece:end {
+  background: transparent !important;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--cherry-scrollBar-background) !important;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--cherry-scrollBar-handle) !important;
+  border-radius: var(--cherry-scrollBar-borderRadius);
+}
+
+::-webkit-scrollbar-corner {
+  background-color: var(--cherry-scrollBar-background);
+}

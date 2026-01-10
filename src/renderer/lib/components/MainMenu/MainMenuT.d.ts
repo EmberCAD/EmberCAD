@@ -1,0 +1,38 @@
+export default class MainMenuT {
+    constructor(parent: any);
+    _parent: any;
+    MenuShortCut: any[];
+    menuActive: boolean;
+    _init(): void;
+    cont: any;
+    _data: any[];
+    set visible(arg: any);
+    get visible(): any;
+    _events(): void;
+    currentCont: any;
+    checkForTextOp(e: any): boolean;
+    execShortcut(uid: any): void;
+    hideAllContainers(): void;
+    removeSelected(menus: any): void;
+    hideFromLevel(level: any, el: any): void;
+    updateContainer(e: any): void;
+    _mmid: any;
+    _mtimeout: NodeJS.Timeout;
+    get rect(): any;
+    set height(arg: any);
+    get height(): any;
+    hide(): void;
+    show(): void;
+    setMenu(template: any, custom: any): void;
+    appleMenu: void;
+    buildFromTemplate(template: any, custom: any): any;
+    mlevel: number;
+    armSeparator(parent: any): void;
+    makeCont(itm: any, parent: any, main: any): void;
+    mmCont: any[];
+    armLabel(itm: any, parent: any, main: any): void;
+    mmLabel: any[];
+    armSubMenu(arr: any, parent: any, main: any): void;
+    convertShortCut(e: any): any;
+    menuAccelerator(acc: any, id: any): string;
+}

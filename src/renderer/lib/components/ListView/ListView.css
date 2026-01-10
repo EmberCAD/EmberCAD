@@ -1,0 +1,65 @@
+:root {
+  --listview-even-element-bg: var(--cherry-background-even);
+  --listview-odd-element-bg: var(--cherry-background-odd);
+  --listview-header-bg: var(--cherry-background-header);
+  --listview-header-handle-bg: var(--cherry-background-headerHandle);
+  --listview-items-hover-color: var(--cherry-text-primary);
+  --listview-items-hover-bg: var(--cherry-background-paper);
+  --listview-items-color: var(--cherry-text-secondary);
+  --listview-items-selected-color: var(--cherry-secondary-contrastText);
+  --listview-items-selected-bg: var(--cherry-secondary-main);
+}
+
+.ch-listView {
+  background: var(--cherry-background-form);
+  line-height: unset;
+}
+
+.ch-listViewTable tr[selected] {
+  background: var(--listview-items-selected-bg) !important;
+  color: var(--listview-items-selected-color) !important;
+  opacity: var(--cherry-opacity-default);
+}
+
+.ch-listViewTable tr[selected]:hover {
+  background: var(--listview-items-selected-bg) !important;
+  color: var(--listview-items-selected-color) !important;
+  opacity: 1;
+}
+
+.ch-listViewTable tr:nth-child(even) {
+  background-color: var(--listview-even-element-bg);
+  opacity: var(--cherry-opacity-default);
+}
+
+.ch-listViewTable tr:nth-child(odd) {
+  background-color: var(--listview-odd-element-bg);
+  opacity: var(--cherry-opacity-default);
+}
+
+.ch-listViewHeader {
+  color: var(--listview-header-color);
+  background-color: var(--listview-header-bg) !important;
+  border-bottom: 1px solid var(--cherry-background-handle);
+}
+
+.ch-listViewTable {
+  position: absolute;
+  border-collapse: collapse;
+  color: var(--listview-items-color);
+  table-layout: fixed;
+  opacity: var(--cherry-opacity-default);
+}
+
+.ch-listViewTable td {
+  padding-left: 6px;
+  padding-right: 6px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.ch-listViewTable tr:hover {
+  color: var(--listview-items-hover-color) !important;
+  background-color: var(--listview-items-hover-bg) !important;
+  opacity: 1;
+}

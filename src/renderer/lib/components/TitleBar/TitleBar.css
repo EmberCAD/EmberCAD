@@ -1,0 +1,86 @@
+:root {
+  --titlebar-bg-color: var(--cherry-background-titleBar);
+  --titlebar-color: var(--cherry-text-primary);
+  --titlebar-icon-color: var(--cherry-text-secondary);
+  --titlebar-icon-color-hover: var(--cherry-text-primary);
+  --titlebar-icon-bg-hover: var(--cherry-background-titleBarHover);
+}
+
+.ch-titleBarAppIcon {
+  position: absolute;
+  max-width: 2rem;
+  min-width: 2rem;
+  height: 100%;
+  background-size: 70% !important;
+  background: url(../../../App/icon.png) no-repeat center;
+}
+
+.ch-titleBarCont {
+  display: flex;
+  position: relative;
+  align-items: center;
+  width: 100vw;
+  height: var(--app-title-bar-height);
+  background: var(--titlebar-bg-color);
+  color: var(--titlebar-color);
+}
+
+.ch-titleBar {
+  display: flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  left: 2rem;
+  -webkit-app-region: drag;
+  width: calc(100% - 10rem);
+  height: 100%;
+  overflow: hidden;
+}
+
+.ch-titleApp {
+  position: absolute;
+  width: auto;
+}
+
+.ch-menuBar {
+  display: none;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  top: 0.05rem;
+  left: 2rem;
+  width: auto;
+  height: 100%;
+}
+
+.ch-titleBarWinIcons {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  position: absolute;
+  right: 0px;
+  top: 0px;
+  height: 100%;
+  width: 8rem;
+  font-size: 16px;
+}
+
+.ch-titleBarWinIco,
+.ch-titleBarWinIcoClose {
+  max-width: 2rem;
+  width: 2rem;
+  padding: 0.3rem 0.8rem;
+  color: var(--titlebar-icon-color);
+  opacity: 0.8;
+}
+
+.ch-titleBarWinIco:hover {
+  color: var(--titlebar-icon-color-hover);
+  background-color: var(--titlebar-icon-bg-hover);
+  opacity: 1;
+}
+
+.ch-titleBarWinIcoClose:hover {
+  background-color: rgb(238, 21, 38);
+  opacity: 1;
+}

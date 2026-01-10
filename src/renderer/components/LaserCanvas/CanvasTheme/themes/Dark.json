@@ -1,0 +1,38 @@
+{
+  "name": "Dark",
+  "background": "#111",
+  "areaFrame": {
+    "strokeWidth": 1,
+    "strokeColor": "#fff9"
+  },
+  "laserCircle": {
+    "strokeWidth": 1,
+    "strokeColor": "white"
+  },
+  "grid": {
+    "strokeColor": "#fff3",
+    "thinLine": {
+      "strokeWidth": 1
+    },
+    "boldLine": {
+      "strokeWidth": 3
+    }
+  },
+  "select": "#88f",
+
+  "scale": {
+    "font": "14px helvetica",
+    "fillStyle": "#fffa",
+    "strokeColor": "#ffff",
+    "mainLine": {
+      "strokeColor": "#fffc"
+    },
+    "auxLine": {
+      "strokeColor": "#fff5"
+    }
+  },
+  "object": {
+    "strokeColor": "#fff"
+  },
+  "key": "dark"
+}

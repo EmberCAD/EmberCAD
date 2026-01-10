@@ -1,0 +1,38 @@
+{
+  "name": "Vinci",
+  "background": "radial-gradient(circle, rgba(255,232,178,1) 0%, rgba(255,204,120,1) 100%)",
+  "areaFrame": {
+    "strokeWidth": 1,
+    "strokeColor": "#0009"
+  },
+  "laserCircle": {
+    "strokeWidth": 1,
+    "strokeColor": "#000e"
+  },
+  "grid": {
+    "strokeColor": "#0003",
+    "thinLine": {
+      "strokeWidth": 1
+    },
+    "boldLine": {
+      "strokeWidth": 3
+    }
+  },
+  "select": "#88f",
+
+  "scale": {
+    "font": "14px helvetica",
+    "fillStyle": "#000a",
+    "strokeColor": "#000f",
+    "mainLine": {
+      "strokeColor": "#000c"
+    },
+    "auxLine": {
+      "strokeColor": "#0005"
+    }
+  },
+  "object": {
+    "strokeColor": "#310"
+  },
+  "key": "vinci"
+}

@@ -1,0 +1,14 @@
+.ch-checkbox {
+}
+
+.ch-checkbox:hover {
+  border-color: var(--cherry-primary-main);
+}
+
+.ch-checker {
+  border: var(--cherry-primary-main);
+  border-radius: var(--cherry-shape-borderRadius);
+}
+.ch-checker i {
+  pointer-events: none;
+}

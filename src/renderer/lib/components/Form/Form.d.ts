@@ -1,0 +1,72 @@
+export default class Form {
+    constructor(id: any);
+    _parent: any;
+    _init(): void;
+    form: boolean;
+    type: string;
+    cont: any;
+    props: string[];
+    onEvents: string[];
+    eventListeners: any[];
+    _events(): void;
+    _setListener(type: any, func: any): void;
+    _clearListeners(node: any, type: any): void;
+    set onKeyDown(arg: any);
+    set onKeyUp(arg: any);
+    set onMouseMove(arg: any);
+    set onMouseDown(arg: any);
+    set onMouseLeave(arg: any);
+    set onMouseEnter(arg: any);
+    set onDblClick(arg: any);
+    set onClick(arg: any);
+    set onDragOver(arg: any);
+    set onDrop(arg: any);
+    getKeys(e: any): {
+        code: any;
+        key: any;
+        keyCode: any;
+        repeat: any;
+        type: any;
+        altKey: any;
+        ctrlKey: any;
+        shiftKey: any;
+        metaKey: any;
+    };
+    getKeysAndMouse(e: any): {
+        target: any;
+        rect: any;
+        contRect: any;
+        uid: any;
+        type: any;
+        name: any;
+        pos: {
+            x: number;
+            y: number;
+        };
+        button: any;
+        altKey: any;
+        ctrlKey: any;
+        shiftKey: any;
+        metaKey: any;
+    };
+    set top(arg: any);
+    get top(): any;
+    set left(arg: any);
+    get left(): any;
+    set height(arg: any);
+    get height(): any;
+    get width(): any;
+    get rect(): any;
+    set color(arg: any);
+    get color(): any;
+    set backgroundColor(arg: any);
+    get backgroundColor(): any;
+    set cursor(arg: any);
+    get cursor(): any;
+    getPos(e: any): {
+        x: number;
+        y: number;
+    };
+    clear(): void;
+    _removeComponents(): void;
+}

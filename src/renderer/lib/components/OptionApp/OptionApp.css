@@ -1,0 +1,101 @@
+:root {
+  --optionapp-bg-color-hover: #9992;
+  --optionapp-border-top-color-hover: var(--cherry-background-paper);
+  --optionapp-border-right-color-hover: var(--cherry-background-paper);
+  --optionapp-bg-color-checked: linear-gradient(0deg, var(--cherry-background-paper), var(--cherry-background-default));
+  --optionappV-bg-color-checked: linear-gradient(90deg, var(--cherry-background-paper), var(--cherry-background-default));
+  --optionapp-border-top-color-checked: var(--cherry-primary-main);
+  --optionapp-border-right-color-checked: var(--cherry-primary-main);
+  --optionapp-border-top-color-disabled: transparent;
+  --optionapp-border-top-thickness: 3px;
+  --optionapp-color-disabled: #555;
+}
+
+.optionAppCont {
+  display: flex;
+  flex: none;
+  height: 100%;
+}
+
+.optionAppContV {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 100%;
+}
+
+label.optionApp,
+label.optionAppV {
+  display: flex;
+  font-family: inherit;
+  font-size: var(--app-font-size-labels);
+  height: 100%;
+  min-width: 2rem;
+  margin: 0;
+  justify-content: center;
+  align-items: center;
+  color: var(--tools-color-inactive);
+  border-top: var(--optionapp-border-top-thickness) solid transparent;
+
+  box-sizing: border-box;
+}
+
+label.optionAppV {
+  height: 3rem;
+  border-top: none;
+  border-bottom: 1px solid var(--cherry-background-handle);
+  border-right: var(--optionapp-border-top-thickness) solid transparent;
+}
+
+input[type='radio'].optionApp {
+  display: none;
+}
+
+/* ---------------------------- */
+
+input[type='radio'].optionApp:not(checked) + label.optionApp:hover {
+  color: var(--tools-color-hover);
+  background-color: var(--optionapp-bg-color-hover);
+
+  border-top: var(--optionapp-border-top-thickness) solid var(--optionapp-border-top-color-hover);
+  box-sizing: border-box;
+}
+
+input[type='radio'].optionApp:checked + label.optionApp:not(hover) {
+  color: var(--tools-color-active);
+  background: var(--optionapp-bg-color-checked);
+  border-top: var(--optionapp-border-top-thickness) solid var(--optionapp-border-top-color-checked);
+  box-sizing: border-box;
+}
+
+input[type='radio'].optionApp:disabled + label.optionApp:not(hover) {
+  color: var(--optionapp-color-disabled);
+  border-top: var(--optionapp-border-top-thickness) solid var(--optionapp-border-top-color-disabled);
+  box-sizing: border-box;
+}
+
+/* ---------------------------- */
+
+input[type='radio'].optionAppV {
+  display: none;
+}
+
+input[type='radio'].optionAppV:not(checked) + label.optionAppV:hover {
+  color: var(--tools-color-hover);
+  background: var(--optionapp-bg-color-hover);
+  border-right: var(--optionapp-border-top-thickness) solid var(--optionapp-border-right-color-hover);
+  box-sizing: border-box;
+}
+
+input[type='radio'].optionAppV:checked + label.optionAppV:not(hover) {
+  color: var(--tools-color-active);
+  background: var(--optionappV-bg-color-checked);
+  border-right: var(--optionapp-border-top-thickness) solid var(--optionapp-border-right-color-checked);
+  box-sizing: border-box;
+}
+
+input[type='radio'].optionAppV:disabled + label.optionAppV:not(hover) {
+  color: var(--optionapp-color-disabled);
+  border-right: var(--optionapp-border-top-thickness) solid var(--optionapp-border-top-color-disabled);
+  box-sizing: border-box;
+}

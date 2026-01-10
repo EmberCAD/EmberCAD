@@ -1,0 +1,38 @@
+export = ContextMenu;
+declare class ContextMenu {
+    constructor(parent: any, template: any);
+    _parent: any;
+    _init(template: any): void;
+    uid: any;
+    active: boolean;
+    menuCounter: number;
+    _data: any[];
+    set visible(arg: any);
+    get visible(): any;
+    _events(): void;
+    menuActive: boolean;
+    initRT: any;
+    initRL: any;
+    execShortcut(ctxid: any): void;
+    hideAllContainers(): void;
+    hideFromLevel(level: any, el: any): void;
+    hideSelected(el: any): void;
+    updateContainer(e: any): void;
+    _ctxid: any;
+    _mtimeout: NodeJS.Timeout;
+    get rect(): any;
+    hide(): void;
+    show(): void;
+    setMenu(template: any): void;
+    buildFromTemplate(template: any): void;
+    mlevel: number;
+    armSeparator(parent: any): void;
+    makeCont(itm: any, main: any): void;
+    mmCont: any[];
+    cont: any;
+    armLabel(itm: any, parent: any, main: any): void;
+    mmLabel: any[];
+    armSubMenu(arr: any, parent: any, main: any): void;
+    itemEnabled(id: any, op: any): void;
+    itemVisible(id: any, op: any): void;
+}

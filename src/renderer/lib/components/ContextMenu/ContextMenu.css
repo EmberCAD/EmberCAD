@@ -1,0 +1,43 @@
+:root {
+  --ctxmenu-bg-color: var(--cherry-menu-background);
+  --ctxmenu-border-color: var(--cherry-menu-border);
+  --ctxmenu-border-radius: 3px;
+}
+
+.ctx-menuCont {
+  display: none;
+  position: absolute;
+  flex-flow: column;
+  background-color: var(--ctxmenu-bg-color);
+  border: 1px solid var(--ctxmenu-border-color);
+  box-sizing: border-box;
+  border-radius: var(--ctxmenu-border-radius);
+  padding-top: 5px;
+  padding-bottom: 5px;
+  box-shadow: var(--cherry-shadow-outer);
+  z-index: 999999;
+}
+
+.ctx-menuItem {
+  display: flex;
+  align-items: center;
+  padding-left: 1rem;
+  padding-right: 1.5rem;
+  min-height: 18px;
+  height: 100%;
+  line-height: 1.4rem;
+}
+
+.ctx-menuItem[disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.ctx-menuItem[selected] {
+  pointer-events: none;
+  background-color: var(--mmenu-hover-bg-color);
+}
+
+.ctx-menuItem:hover:not([disabled]) {
+  background-color: var(--mmenu-hover-bg-color);
+}

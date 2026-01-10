@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Performance Test</title>
+  </head>
+  <body>
+    <!-- Add a canvas element to the HTML file with the id "myCanvas" -->
+    <script src="dither.js"></script>
+
+    <!-- Add a script tag and place the JavaScript code inside -->
+    <script>
+      // Place the measureLinePerformance function code here
+      // Obtain image data from a canvas element
+      const canvas = document.getElementById('myCanvas');
+      const ctx = canvas.getContext('2d');
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // Convert the image to pattern using the Jarvis algorithm and grayscale conversion
+      const resultData = convertImageToPattern(imageData, 'jarvis', true);
+
+      // Display the result on a canvas
+      const resultCanvas = document.getElementById('resultCanvas');
+      const resultCtx = resultCanvas.getContext('2d');
+      resultCtx.putImageData(new ImageData(resultData, canvas.width, canvas.height), 0, 0);
+    </script>
+  </body>
+</html>

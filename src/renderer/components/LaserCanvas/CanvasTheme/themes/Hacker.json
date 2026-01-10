@@ -1,0 +1,38 @@
+{
+  "name": "Hacker",
+  "background": "#050605",
+  "areaFrame": {
+    "strokeWidth": 1,
+    "strokeColor": "#0f09"
+  },
+  "laserCircle": {
+    "strokeWidth": 1,
+    "strokeColor": "#0f0"
+  },
+  "grid": {
+    "strokeColor": "#0f03",
+    "thinLine": {
+      "strokeWidth": 1
+    },
+    "boldLine": {
+      "strokeWidth": 3
+    }
+  },
+  "select": "#88f",
+
+  "scale": {
+    "font": "14px helvetica",
+    "fillStyle": "#0f0a",
+    "strokeColor": "#0f0f",
+    "mainLine": {
+      "strokeColor": "#0f0c"
+    },
+    "auxLine": {
+      "strokeColor": "#0f05"
+    }
+  },
+  "object": {
+    "strokeColor": "#0f0"
+  },
+  "key": "hacker"
+}

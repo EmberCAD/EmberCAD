@@ -1,0 +1,32 @@
+export = Select;
+declare class Select {
+    constructor(id: any);
+    _init(): void;
+    propsFilter: string[];
+    baseClass: string;
+    input: any;
+    select: any;
+    itemsCont: any;
+    _events(): void;
+    set itemsIndex(arg: any);
+    _updateState(): void;
+    defaults(): void;
+    set showing(arg: any);
+    get showing(): any;
+    width: number;
+    set height(arg: any);
+    render(): void;
+    toggleItems(): void;
+    set design(arg: any);
+    get design(): any;
+    designClass: string;
+    _showing: any;
+    set items(arg: any);
+    get items(): any;
+    set text(arg: any);
+    get text(): any;
+    get itemIndex(): any;
+    set placeholder(arg: any);
+    get placeholder(): any;
+    set hint(arg: any);
+}

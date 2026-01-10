@@ -1,0 +1,9 @@
+{
+  "application": {
+    "icon": "",
+    "type": "web",
+    "name": "MyApp",
+    "description": "My CherryJS Application",
+    "hidden": false
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "name": "EmberCAD",
+  "version": "0.7.06",
+  "description": "Cutting-Edge Laser Software",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm run fx && cross-env CHOKIDAR_USEPOLLING=1 node --openssl-legacy-provider ./node_modules/electron-webpack/out/cli.js dev --host 0.0.0.0",
+    "pack": "node --openssl-legacy-provider ./node_modules/electron-builder/out/cli/cli.js --dir",
+    "compile": "npm run fx && node --openssl-legacy-provider ./node_modules/electron-webpack/out/cli.js",
+    "cert": "electron-builder create-self-signed-cert -p redsparrow.eu",
+    "dist": "npm run fx && node --openssl-legacy-provider ./node_modules/electron-webpack/out/cli.js && node --openssl-legacy-provider ./node_modules/electron-builder/out/cli/cli.js",
+    "fx": "cp ./fixes/paper-full.js ./node_modules/paper/dist & cp ./fixes/opentype.js ./node_modules/opentype.js/dist & cp ./fixes/rgbquant.js ./node_modules/rgbquant/src & cp ./fixes/html-webpack-plugin-child-compiler.js ./node_modules/html-webpack-plugin/lib/child-compiler.js & cp ./fixes/webpack-create-hash.js ./node_modules/webpack/lib/util/createHash.js & cp ./fixes/yargs.d.ts ./node_modules/@types/yargs/index.d.ts & cp ./fixes/ms.d.ts ./node_modules/@types/ms/index.d.ts & cp ./fixes/engine.io-server.d.ts ./node_modules/engine.io/build/server.d.ts",
+    "sanitize": "rm -rf ./node_modules/@types/yargs"
+  },
+  "keywords": [],
+  "homepage": "http://embercad.com",
+  "author": {
+    "name": "Grzegorz R. Wróblewski",
+    "email": "grw@redsparrow.eu"
+  },
+  "funding": {
+    "type": "patreon",
+    "url": "https://www.patreon.com/EmberCAD"
+  },
+  "license": "",
+  "devDependencies": {
+    "@types/node": "^14.18.63",
+    "cross-env": "^7.0.3",
+    "electron": "^20.0.3",
+    "electron-builder": "^23.5.1",
+    "electron-webpack": "^2.8.2",
+    "electron-webpack-ts": "^4.0.1",
+    "sass": "^1.49.9",
+    "sass-loader": "^7.3.0",
+    "typescript": "^3.8.3",
+    "uglifyjs-webpack-plugin": "^2.2.0",
+    "webpack": "4.42.1"
+  },
+  "build": {
+    "asar": "true",
+    "asarUnpack": [],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src/renderer/App/icon.png"
+    },
+    "linux": {
+      "category": "Graphics;Printer",
+      "icon": "src/renderer/App/icon.png",
+      "target": [
+        "deb",
+        "snap",
+        "AppImage"
+      ]
+    },
+    "mac": {
+      "category": "your.app.category.type",
+      "icon": "src/renderer/App/icon.png"
+    },
+    "extraResources": [
+      "./node_modules/@electron/remote/**",
+      {
+        "from": "./src/renderer/components/LaserCanvas/CanvasTheme/themes/",
+        "to": "./themes/"
+      }
+    ]
+  },
+  "electronWebpack": {
+    "renderer": {
+      "webpackConfig": "webpack.opts.js"
+    },
+    "main": {
+      "webpackConfig": "webpack.opts.js"
+    }
+  },
+  "volta": {
+    "node": "22.11.0"
+  },
+  "dependencies": {
+    "@electron/remote": "^2.0.8",
+    "cors": "^2.8.5",
+    "express": "^4.18.1",
+    "fontkit": "^2.0.2",
+    "get-system-fonts": "^2.0.2",
+    "html2canvas": "^1.4.1",
+    "hull.js": "^1.0.3",
+    "ip": "^1.1.8",
+    "opentype.js": "^1.3.4",
+    "paper": "^0.12.17",
+    "paperjs-offset": "^1.0.8",
+    "qrcode": "^1.5.1",
+    "rgbquant": "^1.1.2",
+    "serialport": "^10.5.0",
+    "socket.io": "^4.5.2",
+    "source-map-support": "^0.5.21"
+  }
+}

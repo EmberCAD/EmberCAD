@@ -1,0 +1,31 @@
+export const isMac: boolean;
+export const isWeb: false;
+export const mainProcess: typeof remote;
+export default class Application {
+    constructor(name: any, isModern: any, parent: any);
+    _parent: any;
+    isModern: any;
+    mainMenu: MainMenuT;
+    titleBar: TitleBar;
+    set caption(arg: any);
+    get caption(): any;
+    form: Form;
+    _data: {};
+    lineHeight: number;
+    hinter: Hint;
+    _setHeight(): void;
+    setRes(fname: any): void;
+    resize(): void;
+    onEvents(): void;
+    set design(arg: any);
+    get design(): any;
+    _design: any;
+    onClose(): void;
+    onMaximize(): void;
+    onMinimize(): void;
+}
+import * as remote from "@electron/remote";
+import MainMenuT from "../MainMenu/MainMenuT.js";
+import TitleBar from "../TitleBar/TitleBar.js";
+import Form from "../Form/Form.js";
+import Hint from "../Hint/Hint.js";

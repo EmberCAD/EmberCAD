@@ -1,0 +1,17 @@
+:root {
+  --memo-bg-color: var(--cherry-background-paper);
+}
+
+.ch-memo {
+  padding-left: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  border: none;
+  box-sizing: border-box;
+  background: var(--memo-bg-color);
+  text-decoration: none;
+  color: var(--memo-color);
+  outline: none;
+  resize: none;
+  border-radius: 6px;
+}

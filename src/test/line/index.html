@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Performance Test</title>
+  </head>
+  <body>
+    <!-- Add a canvas element to the HTML file with the id "myCanvas" -->
+    <script src="index.js"></script>
+
+    <!-- Add a script tag and place the JavaScript code inside -->
+    <script>
+      // Place the measureLinePerformance function code here
+      function measureLinePerformance() {
+        const iterations = 10000;
+
+        // Using ctx.lineTo
+        const canvas1 = document.createElement('canvas');
+        const ctx1 = canvas1.getContext('2d');
+        document.body.appendChild(canvas1);
+        const start1 = performance.now();
+
+        for (let i = 0; i < iterations; i++) {
+          ctx1.strokeStyle = `rgba(255,0,0,255)`;
+          ctx1.beginPath();
+          ctx1.moveTo(10, 10);
+          ctx1.lineTo(100, 100);
+          ctx1.stroke();
+        }
+
+        const end1 = performance.now();
+        const time1 = end1 - start1;
+        console.log('ctx.lineTo execution time:', time1, 'ms');
+
+        // Using ctx.plotCtx
+        const canvasC = document.createElement('canvas');
+        const ctxC = canvasC.getContext('2d');
+        document.body.appendChild(canvasC);
+        const startC = performance.now();
+
+        for (let i = 0; i < iterations; i++) {
+          lineCtx(10, 10, 100, 100, 0, 0, 0, 255, ctxC);
+        }
+
+        const endC = performance.now();
+        const timeC = endC - startC;
+        console.log('lineCtx execution time:', timeC, 'ms');
+
+        // Using custom line function
+        const canvas2 = document.createElement('canvas');
+        const ctx2 = canvas2.getContext('2d');
+        const start2 = performance.now();
+        document.body.appendChild(canvas2);
+
+        for (let i = 0; i < iterations; i++) {
+          line(10, 10, 100, 100, 0, 0, 0, 255, ctx2);
+        }
+
+        const end2 = performance.now();
+        const time2 = end2 - start2;
+        console.log('Custom line function execution time:', time2, 'ms');
+      }
+
+      // Call the measureLinePerformance function
+      measureLinePerformance();
+    </script>
+  </body>
+</html>

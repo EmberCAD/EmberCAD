@@ -1,0 +1,38 @@
+{
+  "name": "Ember",
+  "background": "radial-gradient(circle, rgba(138,67,0,1) 0%, rgba(50,14,0,1) 100%)",
+  "areaFrame": {
+    "strokeWidth": 1,
+    "strokeColor": "#fff9"
+  },
+  "laserCircle": {
+    "strokeWidth": 1,
+    "strokeColor": "white"
+  },
+  "grid": {
+    "strokeColor": "#fff3",
+    "thinLine": {
+      "strokeWidth": 1
+    },
+    "boldLine": {
+      "strokeWidth": 3
+    }
+  },
+  "select": "#88f",
+
+  "scale": {
+    "font": "14px helvetica",
+    "fillStyle": "#fffa",
+    "strokeColor": "#ffff",
+    "mainLine": {
+      "strokeColor": "#fffc"
+    },
+    "auxLine": {
+      "strokeColor": "#fff5"
+    }
+  },
+  "object": {
+    "strokeColor": "#fff"
+  },
+  "key": "ember"
+}
