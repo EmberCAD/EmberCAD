@@ -342,6 +342,7 @@ class TreeView extends Component {
   }
 
   unselectAll() {
+    if (!this.selected || !this.selected.length) return;
     this.clearSelection(ROOT, true);
     this.updateTree(false);
     if (this._onSelect) this._onSelect([]);

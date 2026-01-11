@@ -169,6 +169,7 @@ export default class LaserCanvas {
   ctxPreview: any;
   antiSnapDelay: boolean;
   editor: Editor;
+  lastSelection: string = '';
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -628,6 +629,13 @@ export default class LaserCanvas {
     ///////////////////////////////////////////    ///////////////////////////////////////////
 
     this.toolbox.onSelect = () => {
+      const selected = this.toolbox.select.selectedItems
+        .map((item) => item.uid)
+        .sort()
+        .join(',');
+      if (this.lastSelection === selected) return;
+      this.lastSelection = selected;
+
       if (typeof this.onSelect === 'function') this.onSelect();
     };
 

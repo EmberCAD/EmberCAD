@@ -538,7 +538,7 @@ export default class Select {
 
       if (i === items.length - 1) {
         group.laserSettings = DeepCopy(DefaultLaserSettings);
-        group.laserSettings.laserType = item.laserSettings.laserType;
+        group.laserSettings.laserType = (item.laserSettings || DefaultLaserSettings).laserType;
         group.currentParent = item.currentParent;
       }
       item.data.prevRotation = 0;
