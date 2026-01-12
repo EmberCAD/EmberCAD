@@ -595,6 +595,8 @@ export default class Work extends View {
 
       if (!selected.length) return;
 
+      const savedIndex = this.cutList.scrollBar.value;
+
       let update = false;
 
       for (let i = 0; i < selected.length; i++) {
@@ -619,6 +621,8 @@ export default class Work extends View {
 
       this.updateLists();
 
+      this.cutList.scrollBar.value = savedIndex;
+
       if (sets.changed !== 'name') this.toggleColumn(this.settingsUid, LS_SETTINGS);
 
       if (selected && selected.length) {
@@ -627,7 +631,9 @@ export default class Work extends View {
         }
       }
       this.canvas.toolbox.select.updateSelection();
-      this.handleOnSelect();
+      this.handleOnSelect(false);
+      this.cutList.updateTree(false);
+
       this.history.commit('Update element settings');
     };
   }
@@ -980,9 +986,9 @@ export default class Work extends View {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  private handleOnSelect() {
+  private handleOnSelect(scrollToSelection = true) {
     this.cutList.clearSelection(ROOT, true);
-    this.cutList.updateSelection();
+    if (scrollToSelection) this.cutList.updateSelection();
 
     this.clearProps();
 
@@ -999,7 +1005,7 @@ export default class Work extends View {
         this.cutList.addSelection(item.uid);
       }
     }
-    this.cutList.updateSelection();
+    if (scrollToSelection) this.cutList.updateSelection();
     this.fillProps(true);
   }
 
@@ -1209,6 +1215,14 @@ export default class Work extends View {
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   updateLists() {
+    const previousOrder = this.cutList.getOrder ? this.cutList.getOrder() : null;
+    const orderMap = {};
+    if (previousOrder && previousOrder.length) {
+      for (let i = 0; i < previousOrder.length; i++) {
+        orderMap[previousOrder[i]] = i;
+      }
+    }
+
     this.canvas.elements = [];
 
     this.cutList.clear();
@@ -1219,6 +1233,7 @@ export default class Work extends View {
 
     if (selected && selected.children) this.addElement(selected.children, ROOT);
 
+    if (Object.keys(orderMap).length) this.cutList.applyOrder(orderMap);
     this.cutList.updateTree();
     this.icFoldsAll.enabled = Object.keys(this.cutList.itemsOrder).length > 1;
 
@@ -1255,6 +1270,11 @@ export default class Work extends View {
         if (child.currentParent !== parentUid) {
           child.currentParent = parentUid || null;
         }
+      }
+
+      let treeParent = parent;
+      if (treeParent === ROOT && child.currentParent && this.cutList.items[child.currentParent]) {
+        treeParent = child.currentParent;
       }
 
       if (!child.laserSettings) {
@@ -1309,7 +1329,7 @@ export default class Work extends View {
       if (hasRenderableChildren) {
         const papa = this.cutList.addBin({
           caption: color + (child.uname || tr(E_KIND_GROUP)),
-          parent,
+          parent: treeParent,
           kind: child.kind,
           groupId: child.children[0].parent.uid,
           uid: child.children[0].parent.uid,
@@ -1322,7 +1342,7 @@ export default class Work extends View {
         if (!(child.uname || child.kind)) continue;
         if (child.kind === E_KIND_GROUP)
           this.cutList.addBin({
-            parent,
+            parent: treeParent,
             caption: color + (child.uname || child.kind),
             hint: child.kind,
             uid: child.uid,
@@ -1333,7 +1353,7 @@ export default class Work extends View {
         else {
           this.cutList.addItem({
             icon,
-            parent,
+            parent: treeParent,
             caption: color + (child.uname || child.kind),
             hint: child.kind,
             uid: child.uid,

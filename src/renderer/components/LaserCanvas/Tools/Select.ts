@@ -523,18 +523,29 @@ export default class Select {
   group(name?) {
     if (this.selectedItems.length < 2) return;
     window[OBJECTS_LAYER].addChild(this.selectionGroup);
-    const group = new this.paper.CompoundPath({ fillRule: 'evenodd' });
+
+    const rawItems = this.filterSubGroups(this.selectedItems);
+    const items = [];
+    const seen = {};
+    for (let i = 0; i < rawItems.length; i++) {
+      const item = rawItems[i];
+      if (!item || item === this.selectionGroup || item.uid === SELECT) continue;
+      const uid = item.uid || i;
+      if (seen[uid]) continue;
+      seen[uid] = true;
+      items.push(item);
+    }
+    if (items.length < 2) return;
+
+    const group = new this.paper.Group();
     group.userGroup = true;
     group.uid = codec64.uId('group_');
     group.kind = E_KIND_GROUP;
     group.uname = E_KIND_GROUP + ' ' + ++Counters.Groups;
     group.laserSettings = DeepCopy(DefaultLaserSettings);
 
-    const items = this.filterSubGroups(this.selectedItems);
-
-    const ids = [];
     for (let i = 0; i < items.length; i++) {
-      let item = items[i];
+      const item = items[i];
 
       if (i === items.length - 1) {
         group.laserSettings = DeepCopy(DefaultLaserSettings);
@@ -545,17 +556,13 @@ export default class Select {
       group.addChild(item);
       item.sel = false;
       item.inGroup = true;
-
-      ids.push(item.uid);
     }
-    if (ids.length < 2) return;
     group.sel = true;
     group.name = 'user_group';
     if (name) group.uname = name;
     this.selectedItems = [];
     this.selectedItems.push(group);
     this.selectionGroup.addChild(group);
-    this.selectionGroup.userGroup = true;
     if (typeof this.onGroup === 'function') this.onGroup(group);
     this.onUpdateSelectionCB();
   }

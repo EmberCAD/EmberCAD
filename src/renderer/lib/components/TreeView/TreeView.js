@@ -429,6 +429,26 @@ class TreeView extends Component {
     }
   }
 
+  applyOrder(orderMap) {
+    if (!orderMap || !this.itemsOrder) return;
+    const sortByOrder = (a, b) => {
+      const hasA = Object.prototype.hasOwnProperty.call(orderMap, a);
+      const hasB = Object.prototype.hasOwnProperty.call(orderMap, b);
+      if (!hasA && !hasB) return 0;
+      if (!hasA) return 1;
+      if (!hasB) return -1;
+      return orderMap[a] - orderMap[b];
+    };
+
+    const parents = Object.keys(this.itemsOrder);
+    for (let i = 0; i < parents.length; i++) {
+      const parent = parents[i];
+      const uids = this.itemsOrder[parent];
+      if (!uids || uids.length < 2) continue;
+      this.itemsOrder[parent] = uids.slice().sort(sortByOrder);
+    }
+  }
+
   getOrder() {
     return this.orderedItems;
   }
@@ -564,8 +584,9 @@ class TreeView extends Component {
     this.linesEnd = this.linesStart + this.linesCount;
 
     if (this.linesEnd > count) {
-      this.linesEnd = this.linesCount;
-      this.scrollBar.value = 0;
+      this.scrollBar.value = Math.max(0, count - this.linesCount);
+      this.linesStart = this.scrollBar.value;
+      this.linesEnd = this.linesStart + this.linesCount;
     }
 
     this.scrollBar.visibles = this.linesCount;
