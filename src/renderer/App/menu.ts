@@ -61,6 +61,11 @@ export function setupMenu(recentItems: RecentMenuItem[] = []) {
           submenu: buildRecentSubmenu(),
         },
         {
+          label: 'Import...',
+          id: 'MM_Import',
+          accelerator: 'CmdOrCtrl+I',
+        },
+        {
           type: 'separator',
         },
         {

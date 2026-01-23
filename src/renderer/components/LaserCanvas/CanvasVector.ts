@@ -10,6 +10,7 @@ import { tr } from '../../lib/api/cherry/langs';
 
 const SVG_DPI = 96;
 const RASTERIZE_DPI = SVG_DPI * 4;
+export const VECTOR_IMPORT_EXTENSIONS = ['svg', 'dxf', 'pdf', 'ai'];
 
 export default class CanvasVector extends CanvasElement {
   fillGroups: [];

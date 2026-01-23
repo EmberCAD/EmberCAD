@@ -33,9 +33,11 @@ import { ToolboxMode } from '../components/LaserCanvas/Tools/Toolbox';
 import TextTools from './views/TopTools/TextTools';
 import PowerIntervalTools from './views/TopTools/PowerIntervalTools';
 import DefaultPowerTools from './views/TopTools/DefaultPowerTool';
+import { VECTOR_IMPORT_EXTENSIONS } from '../components/LaserCanvas/CanvasVector';
 
 const DEFAULT_THEME = 'darkCherry';
 const VIEWS = ['Designer', 'Laser'];
+const IMAGE_IMPORT_EXTENSIONS = ['jpg', 'jpeg', 'png', 'jfif', 'webp', 'bmp'];
 // const VIEWS = ['Designer', 'Laser', 'Settings'];
 export const CURRENT_MOD = 'CURRENT_MOD';
 export const MOD_WORK = 'ident0';
@@ -257,6 +259,9 @@ export default class App {
       this.viewWork.designerIcons.onSave = () => {
         void this.handleSaveProject();
       };
+      this.viewWork.designerIcons.onImport = () => {
+        void this.handleImportAssets();
+      };
     }
 
     this.appSwitch.onClick = (mod) => {
@@ -328,6 +333,10 @@ export default class App {
 
         case 'MM_Open':
           await this.handleOpenProject();
+          break;
+
+        case 'MM_Import':
+          await this.handleImportAssets();
           break;
 
         case 'MM_Quit':
@@ -486,6 +495,33 @@ export default class App {
         detail: error?.message || String(error),
       });
     }
+  }
+
+  private async handleImportAssets() {
+    if (!this.viewWork?.canvas) return;
+
+    this.appSwitch.select(0);
+
+    const defaultPath = this.projectManager?.currentFilePath
+      ? path.dirname(this.projectManager.currentFilePath)
+      : app.getPath('documents');
+    const importExtensions = [...VECTOR_IMPORT_EXTENSIONS, ...IMAGE_IMPORT_EXTENSIONS];
+
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Import File',
+      defaultPath,
+      filters: [
+        { name: 'Supported Files', extensions: importExtensions },
+        { name: 'Vector Files', extensions: VECTOR_IMPORT_EXTENSIONS },
+        { name: 'Image Files', extensions: IMAGE_IMPORT_EXTENSIONS },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+      properties: ['openFile', 'multiSelections'],
+    });
+
+    if (canceled || !filePaths || !filePaths.length) return;
+
+    await this.viewWork.canvas.importFiles(filePaths);
   }
 
   private async handleOpenRecent(filePath: string) {

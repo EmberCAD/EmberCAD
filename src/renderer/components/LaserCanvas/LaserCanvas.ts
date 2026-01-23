@@ -842,6 +842,18 @@ export default class LaserCanvas {
 
   /////////////////////////////////////////////////////////////////////////////////
 
+  async importFiles(filePaths: string[]) {
+    if (!filePaths || !filePaths.length) return;
+    const files = filePaths.map((filePath) => ({
+      path: filePath,
+      name: path.basename(filePath),
+      type: '',
+    }));
+    await this.import(files);
+  }
+
+  /////////////////////////////////////////////////////////////////////////////////
+
   private async import(files: any, e?: any) {
     this.toolbox.select.unselectAll();
 
