@@ -149,6 +149,9 @@ export default class ProjectManager {
 
     const imported = this.laserCanvas.paper.project.importJSON(data);
     this.laserCanvas.objectsLayer.removeChildren();
+    if (!this.laserCanvas.objectsLayer.data) this.laserCanvas.objectsLayer.data = {};
+    const importedData = imported && imported.data ? imported.data : {};
+    this.laserCanvas.objectsLayer.data = { ...importedData };
 
     if (imported && imported.children && imported.children.length) {
       this.laserCanvas.objectsLayer.addChildren(imported.children);
@@ -156,6 +159,9 @@ export default class ProjectManager {
 
     imported.remove();
     this.laserCanvas.toolbox.select.unselectAll();
+    if (typeof this.laserCanvas.refreshScene === 'function') {
+      this.laserCanvas.refreshScene(true);
+    }
     this.laserCanvas.updateSelection();
     this.laserCanvas.paper.view.update();
   }

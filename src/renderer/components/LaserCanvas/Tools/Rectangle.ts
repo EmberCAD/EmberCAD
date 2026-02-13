@@ -80,7 +80,7 @@ export default class Rectangle {
     }
 
     this.rect.setSize(w || 1, h || 1);
-    this.rect.element.fillColor = window[CURRENT_LAYER_FILL];
+    this.rect.element.fillColor = null;
     this.rect.element.strokeColor = getElementColor(this.rect.element);
   }
 

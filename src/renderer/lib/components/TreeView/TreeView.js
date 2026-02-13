@@ -40,6 +40,7 @@ class TreeView extends Component {
     this._data.iconOpen = '<i class="fas fa-chevron-down"></i>';
     this._data.iconClosed = '<i class="fas fa-chevron-right"></i>';
     this._data.iconEmpty = '<i class="fa-regular fa-circle-xmark" style="opacity:.5" ></i>';
+    this._data.captionWidthRem = null;
 
     this.lineHeight = remToPixels(ITEMS_HEIGHT);
 
@@ -209,7 +210,7 @@ class TreeView extends Component {
     let column = e.state.col;
 
     if (column) {
-      if (column.i !== 1 && typeof this.onColumnClick === 'function') this.onColumnClick(column);
+      if (typeof this.onColumnClick === 'function') this.onColumnClick(column);
       return;
     }
 
@@ -568,6 +569,7 @@ class TreeView extends Component {
 
   updateTree(recalculate = true) {
     const count = Object.keys(this.items).length;
+    if (!Number.isFinite(this.scrollBar.value)) this.scrollBar.value = 0;
 
     if (recalculate) {
       this.orderedItems = [];
@@ -597,7 +599,7 @@ class TreeView extends Component {
   scrollToSelected() {
     if (!this.selected || !this.selected.length) return;
     const item = this.items[this.selected[0]];
-    if (!item) return;
+    if (!item || !Number.isFinite(item.index)) return;
     this.scrollBar.value = item.index;
     this.updateTree(false);
   }
@@ -680,7 +682,11 @@ class TreeView extends Component {
       const cap = this.captions[i];
       cap.position = 'relative';
       cap.height = null;
-      cap.width = `calc(100% - ${20 + this.maxIdent}rem)`;
+      if (Number.isFinite(this._data.captionWidthRem)) {
+        cap.width = `${this._data.captionWidthRem}rem`;
+      } else {
+        cap.width = `calc(100% - ${20 + this.maxIdent}rem)`;
+      }
       cap.pointerEvents = 'none';
 
       this.columns[i] = [];
@@ -718,6 +724,9 @@ class TreeView extends Component {
       for (let c = 0; c < ITEM_COLUMNS; c++) {
         const l = this.columns[rowIndex][c];
         l.color = null;
+        l.text = '';
+        l.hint = '';
+        l.state = '';
       }
 
       if (!it) {
@@ -820,6 +829,23 @@ class TreeView extends Component {
 
   get iconClosed() {
     return this._data.iconClosed;
+  }
+
+  set iconEmpty(v) {
+    this._data.iconEmpty = v;
+  }
+
+  get iconEmpty() {
+    return this._data.iconEmpty;
+  }
+
+  set captionWidthRem(v) {
+    const val = Number(v);
+    this._data.captionWidthRem = Number.isFinite(val) ? val : null;
+  }
+
+  get captionWidthRem() {
+    return this._data.captionWidthRem;
   }
 
   set onSelect(func) {

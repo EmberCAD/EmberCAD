@@ -235,7 +235,7 @@ export default class App {
 
     ////////////////////////////////////////
 
-    this.camera = new Camera(this.viewWork.workView.centerPart.cont);
+    this.camera = new Camera(this.viewWork.canvasHost || this.viewWork.workView.centerPart.cont);
     this.camera.topTools = this.cameraTools;
     this.viewWork.camera = this.camera;
 
@@ -270,7 +270,7 @@ export default class App {
       if (!this.viewWork.canvas) return;
 
       if (mod === 'ident0') {
-        const parentView = this.viewWork.workView.centerPart.cont;
+        const parentView = this.viewWork.canvasHost || this.viewWork.workView.centerPart.cont;
         this.viewWork.canvas.setParentView(parentView);
         this.camera.setParentView(parentView);
         this.viewWork.tools.select(0, true);

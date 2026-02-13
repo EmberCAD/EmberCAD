@@ -15,7 +15,7 @@ import CanvasVector from './CanvasVector';
 import { IElementProperties } from '../../App/views/Work/ElementProperties';
 import { E_KIND_IMAGE, E_KIND_TEXT, E_KIND_VECTOR } from './CanvasElement';
 import CanvasImage from './CanvasImage';
-import { checkImageInArea, readUni, weld, writeUni } from '../../modules/helpers';
+import { checkImageInArea, getElementColor, readUni, weld, writeUni } from '../../modules/helpers';
 import { AREA_HEIGHT, AREA_WIDTH } from '../../App/views/TopTools/LaserTools';
 import { SNAP_TO_GRID } from '../../App/views/TopTools/DefaultTool';
 import { CURRENT_MOD, MOD_LASER, MOD_WORK } from '../../App/App';
@@ -23,6 +23,7 @@ import { project } from 'paper/dist/paper-core';
 import Editor, { DefaultTextSettings } from '../../modules/Editor/Editor';
 import { codec64 } from '../../lib/api/cherry/codec64';
 import { DefaultLaserSettings } from '../../App/views/Work/Work';
+import { DEFAULT_LAYER_ID, ensureLayerData, findClosestLayer, getLayerById, setLayerData } from '../../modules/layers';
 
 const BASE_SCALE = 'BASE_SCALE';
 const OFFSET = 'OFFSET';
@@ -40,6 +41,7 @@ export const SNAP_HANDLE = 'SNAP_HANDLE';
 export const SNAP_GRID = 'SNAP_GRID';
 export const SNAP_ANGLE = 'SNAP_ANGLE';
 export const CURRENT_LAYER_FILL = 'CURRENT_LAYER_FILL';
+export const CURRENT_LAYER_ID = 'CURRENT_LAYER_ID';
 export const ELEMENTS = 'ELEMENTS';
 export const HISTORY = 'HISTORY';
 export const VECTORS = 'VECTORS';
@@ -160,6 +162,7 @@ export default class LaserCanvas {
   currentSnapAngle = INIT_SNAP_ANGLE;
 
   currentLayerFill = null;
+  currentLayerId = DEFAULT_LAYER_ID;
   currentCursor: any;
   spaceDown: boolean;
   prevTool: any;
@@ -268,6 +271,10 @@ export default class LaserCanvas {
 
     this.bgColor = this.currentTheme.background;
     this.canvas.style.background = this.bgColor;
+    this.currentLayerId = DEFAULT_LAYER_ID;
+    this.currentLayerFill = getLayerById(this.currentLayerId).color;
+    window[CURRENT_LAYER_ID] = this.currentLayerId;
+    window[CURRENT_LAYER_FILL] = this.currentLayerFill;
 
     this.offsetMousePosition = {
       x: 0,
@@ -589,6 +596,7 @@ export default class LaserCanvas {
       this.currentSnapGrid = window[CURRENT_UNIT] === Unit.Metric ? 5 : writeUni(0.25);
 
       window[SNAP_GRID] = this.currentSnapGrid;
+      window[CURRENT_LAYER_ID] = this.currentLayerId;
       window[CURRENT_LAYER_FILL] = this.currentLayerFill;
 
       switch (this.toolbox.tool) {
@@ -620,6 +628,7 @@ export default class LaserCanvas {
     ///////////////////////////////////////////    ///////////////////////////////////////////
 
     this.toolbox.onElementCreated = (element) => {
+      this.applyLayerToElement(element, this.currentLayerId);
       this.elements[element.uid] = element;
       this.isPreviewChanged = true;
 
@@ -764,6 +773,9 @@ export default class LaserCanvas {
       element.data.textSettings = el.data.textSettings;
       const sourceSettings = el.laserSettings ? DeepCopy(el.laserSettings) : DeepCopy(DefaultLaserSettings);
       element.laserSettings = sourceSettings;
+      const sourceLayerId = el?.data?.layerId || this.currentLayerId;
+      const sourceLayerColor = el?.data?.layerColor || this.currentLayerFill;
+      this.applyLayerToElement(element, sourceLayerId, sourceLayerColor);
 
       this.elements[element.uid] = element;
       this.objectsLayer.addChild(element);
@@ -962,6 +974,83 @@ export default class LaserCanvas {
     element.position = this.paper.view.viewToProject(x, y);
     this.toolbox.select.slectedItems = element.rasterized ? element : element.element.children;
     this.toolbox.select.group();
+    const grouped = this.toolbox.select.selectedItems && this.toolbox.select.selectedItems[0];
+    if (grouped) {
+      this.assignImportedLayers(grouped);
+    } else {
+      this.applyLayerToElement(element, this.currentLayerId, this.currentLayerFill);
+    }
+  }
+
+  setActiveLayer(layerId: string, layerColor?: string) {
+    const layer = getLayerById(layerId);
+    this.currentLayerId = layer.id;
+    this.currentLayerFill = layerColor || layer.color;
+    window[CURRENT_LAYER_ID] = this.currentLayerId;
+    window[CURRENT_LAYER_FILL] = this.currentLayerFill;
+  }
+
+  private resolveImportedColor(item: any) {
+    if (!item) return null;
+    const cssColor = item?.data?.strokeColor || item?.data?.fillColor;
+    return cssColor || null;
+  }
+
+  private assignImportedLayers(root: any) {
+    if (!root) return;
+    const drawable = [];
+    const walk = (item) => {
+      if (!item) return;
+      const hasUid = !!item.uid;
+      if (hasUid) {
+        drawable.push(item);
+      }
+      if (item.children && item.children.length) {
+        for (let i = 0; i < item.children.length; i++) walk(item.children[i]);
+      }
+    };
+    walk(root);
+    if (!drawable.length) return;
+
+    let colored = 0;
+    for (let i = 0; i < drawable.length; i++) {
+      const item = drawable[i];
+      const sourceColor = this.resolveImportedColor(item);
+      if (!sourceColor) continue;
+      const layer = findClosestLayer(sourceColor, true);
+      this.applyLayerToElement(item, layer.id, layer.color, false);
+      colored++;
+    }
+
+    if (!colored) {
+      this.applyLayerToElement(root, this.currentLayerId, this.currentLayerFill, true);
+      return;
+    }
+
+    for (let i = 0; i < drawable.length; i++) {
+      const item = drawable[i];
+      if (!item?.data?.layerId) this.applyLayerToElement(item, this.currentLayerId, this.currentLayerFill, false);
+    }
+  }
+
+  applyLayerToElement(item: any, layerId: string, layerColor?: string, recursive = true) {
+    if (!item) return;
+    const layer = getLayerById(layerId);
+    const color = layerColor || layer.color;
+
+    ensureLayerData(item, layer.id);
+    setLayerData(item, layer.id, color);
+
+    if (item.strokeColor !== undefined) item.strokeColor = getElementColor(item);
+    if (item.fillColor !== undefined) {
+      const laserType = item?.laserSettings?.laserType;
+      item.fillColor = laserType === 2 ? getElementColor(item) : null;
+    }
+
+    if (!recursive || !item.children || !item.children.length) return;
+    for (let i = 0; i < item.children.length; i++) {
+      this.applyLayerToElement(item.children[i], layer.id, color, true);
+    }
   }
 
   private savePNG() {
@@ -1023,7 +1112,11 @@ export default class LaserCanvas {
     if (!images) return;
     Object.keys(images).forEach((uid) => {
       const image = images[uid];
-      image.opacity = image.laserSettings.output ? (op ? 1 : 0.1) : 0;
+      if (image.visible === false) {
+        image.opacity = 0;
+        return;
+      }
+      image.opacity = image.laserSettings.output ? (op ? 1 : 0.1) : 0.35;
     });
   }
 

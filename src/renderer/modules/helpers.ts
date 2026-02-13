@@ -2,8 +2,9 @@
 //@ts-nocheck
 
 import { roundPoint } from '../App/views/Work/ElementProperties';
-import { CURRENT_THEME, CURRENT_UNIT, Unit, WORKING_AREA } from '../components/LaserCanvas/LaserCanvas';
+import { CURRENT_UNIT, Unit, WORKING_AREA } from '../components/LaserCanvas/LaserCanvas';
 import { ImagePreview } from './GCode/ImageG';
+import { getElementDisplayColor } from './layers';
 
 export function readUni(n: number) {
   return window[CURRENT_UNIT] === Unit.Metric ? roundPoint(n, 3) : mmToInch(n);
@@ -30,7 +31,8 @@ function roundPoint(num, places) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 export function getElementColor(item): any {
-  return isInArea(item) ? window[CURRENT_THEME].object.strokeColor : window[CURRENT_THEME].object.outsideAreaColor;
+  if (!isInArea(item)) return 'red';
+  return getElementDisplayColor(item);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////

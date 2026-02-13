@@ -40,6 +40,10 @@ declare class TreeView {
     get iconOpen(): any;
     set iconClosed(arg: any);
     get iconClosed(): any;
+    set iconEmpty(arg: any);
+    get iconEmpty(): any;
+    set captionWidthRem(arg: any);
+    get captionWidthRem(): any;
     set onSelect(arg: any);
     _onSelect: any;
     set onDropped(arg: any);

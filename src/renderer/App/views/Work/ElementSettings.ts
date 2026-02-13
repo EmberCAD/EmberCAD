@@ -61,7 +61,7 @@ export default class ElementSettings {
 
   private init() {
     this.split = new Container2(this.parent);
-    this.split.parts = ['2.5rem', '%'];
+    this.split.parts = ['0rem', '%'];
     // this.split.leftPart.paddingTop = '0.5rem';
     // this.split.leftPart.justifyContent = 'center';
     // this.split.rightPart.paddingTop = '0.5rem';
@@ -79,6 +79,7 @@ export default class ElementSettings {
     this.name.label.text = 'Name';
     this.name.input.width = '15rem';
     this.name.numeric = false;
+    this.name.display = 'none';
 
     this.speed = new LabelInput(this.splitBottom.topPart);
     this.speed.label.text = 'Speed';
@@ -159,12 +160,10 @@ export default class ElementSettings {
   clear() {
     this.parent.opacity = 0.5;
 
-    this.name.input.text = '';
     this.speed.input.text = '';
     this.power.input.text = '';
     this.passes.input.text = '';
 
-    this.name.disabled = true;
     this.speed.disabled = true;
     this.power.disabled = true;
     this.passes.disabled = true;
@@ -175,14 +174,16 @@ export default class ElementSettings {
   fillProps(obj: IElementSettings) {
     this.parent.opacity = 1;
 
-    this.name.disabled = false;
     this.speed.disabled = false;
     this.power.disabled = false;
     this.passes.disabled = false;
 
-    this.name.input.text = obj.name;
     this.speed.input.text = obj.speed;
     this.power.input.text = obj.power;
     this.passes.input.text = obj.passes;
+  }
+
+  setLaserControlsVisible(visible: boolean) {
+    this.splitBottom.topPart.display = visible ? 'flex' : 'none';
   }
 }

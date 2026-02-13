@@ -2,7 +2,6 @@
 //@ts-nocheck
 import View from '../View';
 import LaserCanvas, {
-  CURRENT_THEME,
   ELEMENTS,
   HISTORY,
   IMAGES,
@@ -20,7 +19,7 @@ import LabelPanel from '../../../components/LabelPanel/LabelPanel';
 import Container2 from '../../../lib/components/Container2/Container2';
 import ContainerSized from '../../../lib/components/ContainerSized/ContainerSized';
 
-import { TreeView, BIN, ITEM, BOTTOM, ROOT } from '../../../lib/components/TreeView/TreeView';
+import { TreeView, BIN, BOTTOM, ROOT } from '../../../lib/components/TreeView/TreeView';
 import { SELECT } from '../../../components/LaserCanvas/Tools/Select';
 import ElementProperties, { IElementProperties } from './ElementProperties';
 import {
@@ -41,7 +40,18 @@ import DesignerIcons from '../TopIcons/DesignerIcons';
 import LaserTools, { AREA_HEIGHT, AREA_WIDTH } from '../TopTools/LaserTools';
 import { CURRENT_MOD, MOD_LASER, MOD_WORK } from '../../App';
 import { ImagePreview } from '../../../modules/GCode/ImageG';
-import { applyStrokeFill, checkImageInArea } from '../../../modules/helpers';
+import { applyStrokeFill, checkImageInArea, getElementColor } from '../../../modules/helpers';
+import {
+  DEFAULT_LAYER_ID,
+  ensureLayerData,
+  getDefaultLayerOrder,
+  getLayerById,
+  getLayerUiColor,
+  getLayerId,
+  isToolLayer,
+  LAYER_ORDER_KEY,
+  LAYER_PALETTE,
+} from '../../../modules/layers';
 
 export enum ElementLaserType {
   Unassigned = 0,
@@ -60,6 +70,7 @@ export const DefaultLaserSettings = {
   power: 20,
   passes: 1,
   output: true,
+  includeInFrame: true,
   air: true,
   constantPower: false,
   minPower: 15,
@@ -121,9 +132,14 @@ const LaserType = [
   },
 ];
 
-const LS_SETTINGS = 1; // columns in cutItems
-const LS_AIR = 2;
-const LS_OUTPUT = 3;
+const NON_OUTPUT_OPACITY = 0.35;
+
+const COL_FIRE = 1;
+const COL_STAR = 2;
+const COL_EYE = 3;
+const COL_AIR = 4;
+const COL_TOOL_FRAME = 0;
+const COL_TOOL_EYE = 1;
 
 export default class Work extends View {
   private canvas: any;
@@ -172,6 +188,14 @@ export default class Work extends View {
   private _topToolsAux: //@ ts-nocheck
   any;
   defaultPowerTopTools: any;
+  layerPalette: any;
+  layerButtons: any = {};
+  layerOrder: string[] = [];
+  layerItemsMap: Record<string, any[]> = {};
+  centerSplit: Container2;
+  canvasHost: HTMLDivElement;
+  paletteHost: HTMLDivElement;
+  private _treeSyncLock = 0;
 
   constructor(private par: any) {
     super(par, 'Work');
@@ -183,7 +207,17 @@ export default class Work extends View {
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   private _init() {
-    this.canvas = new LaserCanvas(this.workView.centerPart.cont);
+    this.centerSplit = new Container2(this.workView.centerPart);
+    this.centerSplit.parts = ['%', '3rem'];
+    this.centerSplit.bottomPart.overflow = 'visible';
+    this.centerSplit.topPart.overflow = 'hidden';
+    this.centerSplit.topPart.cont.style.minHeight = '0';
+
+    this.canvasHost = this.centerSplit.topPart.cont;
+    this.paletteHost = this.centerSplit.bottomPart.cont;
+    this.paletteHost.classList.add('ec-layer-palette-host');
+
+    this.canvas = new LaserCanvas(this.canvasHost);
     window[ELEMENTS] = this.canvas.elements;
 
     this.history = new History(this.canvas);
@@ -259,6 +293,8 @@ export default class Work extends View {
     /////////////
 
     this.cutList = new TreeView(this.elCuts.body);
+    this.cutList.iconEmpty = '';
+    this.cutList.captionWidthRem = 3.2;
     this.cutList.binMode = false;
     this.cutList.multiselect = true;
     this.cutList.type = ElementLaserType.Line;
@@ -278,6 +314,8 @@ export default class Work extends View {
     this.initSnapper();
 
     /////////////
+    this.initLayerState();
+    this.initLayerPalette();
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -303,6 +341,153 @@ export default class Work extends View {
     /////////
 
     this.handleText();
+  }
+
+  private initLayerState() {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(LAYER_ORDER_KEY) || 'null');
+    } catch (error) {
+      saved = null;
+    }
+    const defaults = getDefaultLayerOrder();
+    if (!Array.isArray(saved) || !saved.length) {
+      this.layerOrder = defaults;
+    } else {
+      const valid = saved.filter((id) => getLayerById(id));
+      const missing = defaults.filter((id) => !valid.includes(id));
+      this.layerOrder = [...valid, ...missing];
+    }
+    window[LAYER_ORDER_KEY] = this.layerOrder.slice();
+    if (!this.canvas.objectsLayer.data) this.canvas.objectsLayer.data = {};
+    if (Array.isArray(this.canvas.objectsLayer.data.layerOrder) && this.canvas.objectsLayer.data.layerOrder.length) {
+      this.layerOrder = this.canvas.objectsLayer.data.layerOrder.slice();
+    }
+    const def = getLayerById(DEFAULT_LAYER_ID);
+    this.canvas.setActiveLayer(def.id, def.color);
+  }
+
+  private saveLayerOrder() {
+    window[LAYER_ORDER_KEY] = this.layerOrder.slice();
+    localStorage.setItem(LAYER_ORDER_KEY, JSON.stringify(this.layerOrder));
+    if (!this.canvas.objectsLayer.data) this.canvas.objectsLayer.data = {};
+    this.canvas.objectsLayer.data.layerOrder = this.layerOrder.slice();
+  }
+
+  private getLayerToolsMap() {
+    if (!this.canvas.objectsLayer.data) this.canvas.objectsLayer.data = {};
+    if (!this.canvas.objectsLayer.data.layerTools) this.canvas.objectsLayer.data.layerTools = {};
+    return this.canvas.objectsLayer.data.layerTools;
+  }
+
+  private createLayerTool(layerId: string) {
+    const base = DeepCopy(DefaultLaserSettings);
+    if (isToolLayer(layerId)) {
+      base.output = false;
+      base.includeInFrame = true;
+    }
+    base.visible = true;
+    return base;
+  }
+
+  private getLayerTool(layerId: string) {
+    const tools = this.getLayerToolsMap();
+    if (!tools[layerId]) tools[layerId] = this.createLayerTool(layerId);
+    const layerTool = tools[layerId];
+    if (layerTool.output === undefined) layerTool.output = !isToolLayer(layerId);
+    if (layerTool.includeInFrame === undefined) layerTool.includeInFrame = true;
+    if (layerTool.visible === undefined) layerTool.visible = true;
+    if (layerTool.air === undefined) layerTool.air = true;
+    if (layerTool.laserType === undefined) layerTool.laserType = ElementLaserType.Line;
+    if (layerTool.speed === undefined) layerTool.speed = DefaultLaserSettings.speed;
+    if (layerTool.power === undefined) layerTool.power = DefaultLaserSettings.power;
+    if (layerTool.passes === undefined) layerTool.passes = DefaultLaserSettings.passes;
+    if (isToolLayer(layerId)) layerTool.output = false;
+    return layerTool;
+  }
+
+  private applyLayerToolToItems(layerId: string, items: any[]) {
+    const layerTool = this.getLayerTool(layerId);
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item || !item.laserSettings) continue;
+      item.laserSettings.speed = layerTool.speed;
+      item.laserSettings.power = layerTool.power;
+      item.laserSettings.passes = layerTool.passes;
+      item.laserSettings.air = layerTool.air;
+      item.laserSettings.laserType = layerTool.laserType;
+      item.laserSettings.output = isToolLayer(layerId) ? false : !!layerTool.output;
+      item.laserSettings.includeInFrame = !!layerTool.includeInFrame;
+      item.visible = !!layerTool.visible;
+      this.applyVisualStyle(item);
+      item.opacity = this.getElementOpacity(item);
+    }
+  }
+
+  private initLayerPalette() {
+    const parent = this.paletteHost;
+    if (!parent) return;
+    parent.innerHTML = '';
+    parent.style.position = 'relative';
+    this.layerPalette = document.createElement('div');
+    this.layerPalette.className = 'ec-layer-palette';
+    this.layerPalette.style.position = 'absolute';
+    this.layerPalette.style.left = '0';
+    this.layerPalette.style.right = '0';
+    this.layerPalette.style.top = '50%';
+    this.layerPalette.style.transform = 'translateY(-50%)';
+    this.layerPalette.style.padding = '0 0.35rem';
+    parent.appendChild(this.layerPalette);
+
+    this.layerButtons = {};
+    for (let i = 0; i < LAYER_PALETTE.length; i++) {
+      const layer = LAYER_PALETTE[i];
+      const btn = document.createElement('button');
+      btn.className = 'ec-layer-btn';
+      btn.type = 'button';
+      const uiColor = getLayerUiColor(layer.id, layer.color);
+      btn.style.background = uiColor;
+      if (uiColor === '#ffffff') btn.style.color = '#000000';
+      btn.textContent = layer.id;
+      btn.title = `Layer ${layer.id}`;
+      btn.onclick = () => {
+        this.canvas.setActiveLayer(layer.id, layer.color);
+        const selected = this.canvas.toolbox.select.selectedItems || [];
+        if (selected.length) {
+          this.assignSelectionToLayer(layer.id, layer.color);
+          this.history.commit('Assign layer');
+        } else {
+          this.refreshPaletteSelection();
+        }
+      };
+      this.layerPalette.appendChild(btn);
+      this.layerButtons[layer.id] = btn;
+    }
+    this.refreshPaletteSelection();
+  }
+
+  private assignSelectionToLayer(layerId: string, layerColor: string, selectedUids?: string[]) {
+    const targets = [];
+    if (selectedUids && selectedUids.length) {
+      for (let i = 0; i < selectedUids.length; i++) {
+        const uid = selectedUids[i];
+        const item = this.canvas.elements[uid];
+        if (item) targets.push(item);
+      }
+    } else {
+      const selected = this.canvas.toolbox.select.selectedItems || [];
+      for (let i = 0; i < selected.length; i++) targets.push(selected[i]);
+    }
+
+    for (let i = 0; i < targets.length; i++) {
+      this.canvas.applyLayerToElement(targets[i], layerId, layerColor, true);
+      const items = targets[i].children && targets[i].children.length ? targets[i].children : [targets[i]];
+      this.applyLayerToolToItems(layerId, items);
+    }
+    this.updateLists();
+    this.handleOnSelect(false);
+    this.refreshPaletteSelection();
+    this.canvas.isPreviewChanged = true;
   }
 
   private handleText() {
@@ -462,7 +647,7 @@ export default class Work extends View {
     };
 
     this.canvas.onUnselectAll = () => {
-      this.cutList.unselectAll();
+      this.runWithTreeSyncLock(() => this.cutList.unselectAll());
 
       this.clearProps();
     };
@@ -491,11 +676,14 @@ export default class Work extends View {
 
   private handleCutList() {
     this.cutList.onSelect = (selected) => {
-      this.selectElements(selected);
+      if (this.isTreeSyncLocked()) return;
+      this.runWithTreeSyncLock(() => {
+        this.selectElements(selected || []);
+      });
+      this.handleOnSelect();
     };
 
     this.cutList.onColumnClick = (column) => {
-      if (column.i === 0 && this.canvas.elements[column.uid].kind === E_KIND_IMAGE) return;
       this.canvas.isPreviewChanged = true;
       this.toggleColumn(column.uid, column.i);
     };
@@ -508,29 +696,19 @@ export default class Work extends View {
       if (!target) return;
       const targetUid = target.uid;
 
-      if (target.type === ITEM) {
-        for (let i = 0; i < sources.length; i++) {
-          const sourceUid = sources[i];
-          if (sourceUid !== targetUid && this.cutList.items[sourceUid].type !== BIN) {
-            const sourceItem = this.canvas.elements[sourceUid];
-            const targetItem = this.canvas.elements[targetUid];
-            if (cover !== BOTTOM) {
-              sourceItem.insertBelow(targetItem);
-            } else {
-              sourceItem.insertAbove(targetItem);
-            }
-          }
-        }
-      }
-
       if (target.type === BIN) {
-        for (let i = 0; i < sources.length; i++) {
-          const sourceUid = sources[i];
-          if (sourceUid !== targetUid) {
-            const sourceItem = this.canvas.elements[sourceUid];
-            const targetItem = this.canvas.elements[targetUid];
-            targetItem.addChild(sourceItem);
-          }
+        const sourceBins = sources.filter((uid) => this.cutList.items[uid] && this.cutList.items[uid].type === BIN);
+        if (sourceBins.length) {
+          const localOrder = this.layerOrder.slice();
+          const moved = sourceBins.filter((uid) => localOrder.includes(uid));
+          const keep = localOrder.filter((uid) => !moved.includes(uid));
+          let targetIndex = keep.indexOf(targetUid);
+          if (targetIndex < 0) targetIndex = keep.length;
+          if (cover === BOTTOM) targetIndex++;
+          targetIndex = Math.max(0, Math.min(targetIndex, keep.length));
+          keep.splice(targetIndex, 0, ...moved);
+          this.layerOrder = keep;
+          this.saveLayerOrder();
         }
       }
 
@@ -540,41 +718,19 @@ export default class Work extends View {
 
     ////////////////////////////////////////////
     this.cutList.onDblClicked = (e) => {
-      const el = e.target;
-      const col = e.state.col;
-      const clickX = e.event.offsetX;
-
-      const speed = el.querySelector('[ls="speed"]');
-      const power = el.querySelector('[ls="power"]');
-      const passes = el.querySelector('[ls="passes"]');
       this.settingsUid = undefined;
-
-      if (!speed || !power || !passes) return;
 
       const uid = e.state.uid;
 
       this.settingsUid = uid;
 
-      const element = this.canvas.elements[uid];
-      const laserSettings = element.laserSettings;
-      const name = element.uname;
+      const laserSettings = this.getLayerTool(uid);
+      const name = `Layer ${uid}`;
       this.elementSettings.fillProps({ ...laserSettings, name });
+      this.elementSettings.setLaserControlsVisible(!isToolLayer(uid));
 
-      this.selectElements([element]);
-
-      this.elementSettings.name.input.input.select();
-
-      if (col && clickX >= speed.offsetLeft && clickX <= speed.offsetLeft + speed.offsetWidth) {
-        this.elementSettings.speed.input.input.select();
-      }
-
-      if (col && clickX >= power.offsetLeft && clickX <= power.offsetLeft + power.offsetWidth) {
-        this.elementSettings.power.input.input.select();
-      }
-
-      if (col && clickX >= passes.offsetLeft && clickX <= passes.offsetLeft + passes.offsetWidth) {
-        this.elementSettings.passes.input.input.select();
-      }
+      this.selectElements([{ uid, type: BIN, layerId: uid }]);
+      if (!isToolLayer(uid)) this.elementSettings.speed.input.input.select();
     };
   }
 
@@ -582,53 +738,38 @@ export default class Work extends View {
 
   private handleSettings() {
     this.elementSettings.onChange = (sets) => {
-      let selected;
-
-      const isInSelection = this.cutList.selected.includes(this.settingsUid);
-
-      if (this.settingsUid && !isInSelection) {
-        selected = [];
-        selected.push(this.settingsUid);
-      } else {
-        selected = this.cutList.selected;
+      if (sets.changed === 'name') return;
+      const selectedLayerIds = this.getSelectedLayerIds();
+      let targetLayerIds = selectedLayerIds;
+      if (this.settingsUid && !selectedLayerIds.includes(this.settingsUid)) {
+        targetLayerIds = [this.settingsUid];
       }
-
-      if (!selected.length) return;
+      if (!targetLayerIds.length) return;
 
       const savedIndex = this.cutList.scrollBar.value;
+      const selectedItems = (this.canvas.toolbox.select.selectedItems || []).slice();
 
-      let update = false;
-
-      for (let i = 0; i < selected.length; i++) {
-        const settingsUid = selected[i];
-        if (!settingsUid || !this.canvas.elements[settingsUid]) continue;
-        if (sets.changed === 'name' && sets.name) {
-          this.canvas.elements[settingsUid].uname = sets.name;
-          this.settingsUid = undefined;
-
-          update = true;
-        } else {
-          let { power, speed, passes } = sets;
-
-          if (sets.changed === 'power') this.canvas.elements[settingsUid].laserSettings.power = power;
-          if (sets.changed === 'speed') this.canvas.elements[settingsUid].laserSettings.speed = speed;
-          if (sets.changed === 'passes') this.canvas.elements[settingsUid].laserSettings.passes = passes;
-        }
+      for (let i = 0; i < targetLayerIds.length; i++) {
+        const layerId = targetLayerIds[i];
+        if (isToolLayer(layerId)) continue;
+        const layerTool = this.getLayerTool(layerId);
+        const layerItems = this.getItemsForLayer(layerId);
+        const { power, speed, passes } = sets;
+        if (sets.changed === 'power') layerTool.power = power;
+        if (sets.changed === 'speed') layerTool.speed = speed;
+        if (sets.changed === 'passes') layerTool.passes = passes;
+        this.applyLayerToolToItems(layerId, layerItems);
       }
       this.canvas.isPreviewChanged = true;
-
-      this.handleUnselectAll();
-
       this.updateLists();
-
       this.cutList.scrollBar.value = savedIndex;
-
-      if (sets.changed !== 'name') this.toggleColumn(this.settingsUid, LS_SETTINGS);
-
-      if (selected && selected.length) {
-        for (let i = 0; i < selected.length; i++) {
-          this.canvas.toolbox.select.select(this.canvas.elements[selected[i]]);
-        }
+      this.canvas.toolbox.select.unselectAll();
+      for (let i = 0; i < selectedItems.length; i++) {
+        const selected = selectedItems[i];
+        const item = selected && selected.uid ? this.canvas.elements[selected.uid] : null;
+        if (!item) continue;
+        item.sel = false;
+        this.canvas.toolbox.select.select(item);
       }
       this.canvas.toolbox.select.updateSelection();
       this.handleOnSelect(false);
@@ -682,19 +823,32 @@ export default class Work extends View {
     for (let i = 0; i < selected.length; i++) {
       const el = selected[i];
 
+      if (el && el.uid && el.type === BIN && (el.layerId || this.cutList.items?.[el.uid]?.layerId)) {
+        const layerId = el.layerId || this.cutList.items[el.uid].layerId;
+        if (!layerId) continue;
+        const layerItems = this.getItemsForLayer(layerId);
+        for (let j = 0; j < layerItems.length; j++) {
+          const item = layerItems[j];
+          if (!item || !item.uid) continue;
+          if (item.kind === E_KIND_IMAGE && checkImageInArea(item)) {
+            ImagePreview(item);
+          }
+          item.sel = false;
+          this.canvas.toolbox.select.select(item);
+        }
+        continue;
+      }
+
       if (el && el.uid && el.type !== BIN) {
         if (el.kind === E_KIND_IMAGE) {
           if (checkImageInArea(el)) {
             ImagePreview(el);
           }
         }
-        this.canvas.elements[el.uid].sel = false;
-        this.canvas.toolbox.select.select(this.canvas.elements[el.uid]);
-      }
-
-      if (el && el.uid && el.type === BIN && this.canvas.elements[el.groupId]) {
-        this.canvas.elements[el.groupId].sel = false;
-        this.canvas.toolbox.select.select(this.canvas.elements[el.groupId]);
+        const target = this.canvas.elements[el.uid];
+        if (!target) continue;
+        target.sel = false;
+        this.canvas.toolbox.select.select(target);
       }
     }
 
@@ -710,266 +864,59 @@ export default class Work extends View {
   private clearProps() {
     this.elementProperties.clear();
     this.elementSettings.clear();
+    this.elementSettings.setLaserControlsVisible(true);
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   private updateColumns(uid) {
-    const firstChildUid = this.cutList.itemsOrder[uid][0];
-    for (let c = 0; c < 4; c++) {
-      const isBin = this.cutList.items[firstChildUid].type === BIN;
-      if (isBin && this.cutList.itemsOrder[firstChildUid]) {
-        const nextChildUid = this.cutList.itemsOrder[firstChildUid][0];
-        this.parentUpdate(nextChildUid, c);
+    this.updateLists();
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  private async toggleColumn(uid, column, commitHistory = true) {
+    const targetLayerIds = this.getTargetLayerIdsForUid(uid);
+    if (!targetLayerIds.length) return;
+    let hasChanges = false;
+
+    for (let i = 0; i < targetLayerIds.length; i++) {
+      const layerId = targetLayerIds[i];
+      const items = this.getItemsForLayer(layerId);
+      const layerTool = this.getLayerTool(layerId);
+      if (isToolLayer(layerId)) {
+        if (column === COL_TOOL_FRAME) {
+          layerTool.includeInFrame = !layerTool.includeInFrame;
+          hasChanges = true;
+        } else if (column === COL_TOOL_EYE) {
+          layerTool.visible = !layerTool.visible;
+          hasChanges = true;
+        }
       } else {
-        this.parentUpdate(firstChildUid, c);
-      }
-    }
-    this.cutList.updateTree(false);
-  }
-
-  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  private async toggleColumn(uid, column) {
-    let payload;
-
-    if (!this.canvas.elements[uid]) return;
-
-    if (column === 0) {
-      let type = this.canvas.elements[uid].laserSettings.laserType + 1;
-      if (type > ElementLaserType.Fill) type = ElementLaserType.Line;
-      this.canvas.elements[uid].laserSettings.laserType = type;
-      payload = {
-        type,
-      };
-    }
-
-    if (column === 1) {
-      const { speed, power, passes } = this.canvas.elements[uid].laserSettings;
-      this.canvas.elements[uid].laserSettings = {
-        ...this.canvas.elements[uid].laserSettings,
-        speed,
-        power,
-        passes,
-      };
-
-      payload = {
-        speed,
-        power,
-        passes,
-      };
-    }
-
-    if (column === 2) {
-      const air = !this.canvas.elements[uid].laserSettings.air;
-      this.canvas.elements[uid].laserSettings.air = air;
-      payload = {
-        air,
-      };
-    }
-
-    if (column === 3) {
-      const output = !this.canvas.elements[uid].laserSettings.output;
-      this.canvas.elements[uid].laserSettings.output = output;
-
-      payload = {
-        output,
-      };
-    }
-
-    if (this.cutList.items[uid] && this.cutList.items[uid].type === BIN) {
-      if (!this.cutList.items[uid].changedColumn) this.cutList.items[uid].changedColumn = [];
-
-      this.canvas.elements[uid].laserSettings.changedColumn[column] = false;
-      this.cutList.items[uid].changedColumn[column] = false;
-
-      const children = this.cutList.itemsOrder[uid];
-      this.updateItem(uid, column);
-
-      this.childrenUpdate(children, uid, column, payload);
-      this.parentUpdate(uid, column);
-
-      this.cutList.updateTree();
-      this.history.commit('Update laser settings');
-
-      return;
-    }
-
-    if (this.cutList.items[uid].selected) {
-      for (let i = 0; i < this.cutList.selected.length; i++) {
-        const cuid = this.cutList.selected[i];
-        if (column === 0) {
-          this.canvas.elements[cuid].laserSettings.laserType = payload.type;
-        }
-
-        if (column === 1) {
-          this.canvas.elements[cuid].laserSettings = {
-            ...this.canvas.elements[cuid].laserSettings,
-            ...payload,
-          };
-        }
-
-        if (column === 2) {
-          this.canvas.elements[cuid].laserSettings.air = payload.air;
-        }
-
-        if (column === 3) {
-          this.canvas.elements[cuid].laserSettings.output = payload.output;
-        }
-        this.updateItem(cuid, column);
-      }
-    } else {
-      if (column === 0) {
-        this.canvas.elements[uid].laserSettings.laserType = payload.type;
-      }
-
-      if (column === 1) {
-        this.canvas.elements[uid].laserSettings = {
-          ...this.canvas.elements[uid].laserSettings,
-          ...payload,
-        };
-      }
-
-      if (column === 2) {
-        this.canvas.elements[uid].laserSettings.air = payload.air;
-      }
-
-      if (column === 3) {
-        this.canvas.elements[uid].laserSettings.output = payload.output;
-      }
-
-      this.updateItem(uid, column);
-    }
-
-    this.parentUpdate(uid, column);
-
-    this.cutList.updateTree();
-    this.history.commit('Update laser settings');
-  }
-
-  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  childrenUpdate(children: any, uid: any, column, payload: any) {
-    for (let i = 0; i < children.length; i++) {
-      const iuid = children[i];
-      const item = this.cutList.items[iuid];
-
-      if (item.parent !== uid) break;
-      if (item.type === 'bin') {
-        const children = this.cutList.itemsOrder[iuid];
-        item.changedColumn[column] = false;
-        this.childrenUpdate(children, iuid, column, payload);
-      }
-
-      this.cutList.items[iuid].columns[column] = DeepCopy(this.cutList.items[uid].columns[column]);
-
-      if (column === 0) {
-        this.canvas.elements[iuid].laserType = payload.type;
-        this.canvas.elements[iuid].fillColor = payload.fillColor;
-        this.canvas.elements[iuid].strokeColor = payload.strokeColor;
-      }
-      if (column === 1) {
-        const { speed, power, passes } = payload;
-        this.canvas.elements[iuid].laserSettings.speed = speed;
-        this.canvas.elements[iuid].laserSettings.power = power;
-        this.canvas.elements[iuid].laserSettings.passes = passes;
-      }
-      if (column === 2) {
-        this.canvas.elements[iuid].laserSettings.air = payload.air;
-      }
-      if (column === 3) {
-        this.canvas.elements[iuid].opacity = payload.opacity;
-        this.canvas.elements[iuid].laserSettings.output = payload.output;
-      }
-
-      this.updateItem(iuid, column);
-    }
-  }
-
-  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  private parentUpdate(uid: any, column: any) {
-    let parentUid = this.cutList.items[uid].parent;
-    let parent = this.cutList.items[parentUid];
-
-    if (parent) {
-      if (!parent.changedColumn) parent.changedColumn = [];
-
-      this.checkForSame(parentUid, column);
-
-      parentUid = this.cutList.items[parentUid].parent;
-      parent = this.cutList.items[parentUid];
-      if (parent) {
-        this.parentUpdate(parentUid, column);
-      }
-    }
-  }
-
-  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  checkForSame(uid, column) {
-    const children = this.cutList.itemsOrder[uid];
-    if (!children || !children.length) return;
-
-    let same = true;
-    if (children.length > 1)
-      for (let i = 0; i < children.length - 1; i++) {
-        const uid1 = children[i];
-        const uid2 = children[i + 1];
-        if (this.cutList.items[uid1].columns[column]) {
-          const col1 = this.cutList.items[uid1].columns[column].html;
-          const col2 = this.cutList.items[uid2].columns[column].html;
-          const changed1 = this.canvas.elements[uid1].laserSettings.changedColumn[column] || false;
-          const changed2 = this.canvas.elements[uid2].laserSettings.changedColumn[column] || false;
-
-          if (col1 !== col2 || changed1 !== changed2) {
-            same = false;
-            break;
-          }
+        if (column === COL_FIRE) {
+          layerTool.output = !layerTool.output;
+          hasChanges = true;
+        } else if (column === COL_STAR) {
+          let type = (layerTool.laserType || ElementLaserType.Line) + 1;
+          if (type > ElementLaserType.Fill) type = ElementLaserType.Line;
+          layerTool.laserType = type;
+          hasChanges = true;
+        } else if (column === COL_EYE) {
+          layerTool.visible = !layerTool.visible;
+          hasChanges = true;
+        } else if (column === COL_AIR) {
+          layerTool.air = !layerTool.air;
+          hasChanges = true;
         }
       }
-
-    if (uid !== ROOT) {
-      let parentUid;
-      parentUid = this.cutList.items[uid].parent;
-
-      if (parentUid !== ROOT) parent = this.cutList.items[parentUid];
-
-      const cuid = children[0];
-      const ccolumn = DeepCopy(this.cutList.items[children[0]].columns[column]);
-
-      const element = this.canvas.elements[uid];
-      element.laserSettings.changedColumn[column] = !same;
-      this.cutList.items[uid].columns[column] = ccolumn;
-
-      if (column === 0) {
-        if (same) {
-          element.laserSettings.laserType = this.canvas.elements[cuid].laserSettings.laserType;
-        } else {
-          element.laserSettings.laserType = ElementLaserType.Mixed;
-        }
-      }
-
-      if (column === 1) {
-        if (same) {
-          const { speed, power, passes } = this.canvas.elements[cuid].laserSettings;
-          element.laserSettings.speed = speed;
-          element.laserSettings.power = power;
-          element.laserSettings.passes = passes;
-        }
-      }
-
-      if (column === 2) {
-        element.laserSettings.air = same ? this.canvas.elements[cuid].laserSettings.air : true;
-      }
-
-      if (column === 3) {
-        element.laserSettings.output = same ? this.canvas.elements[cuid].laserSettings.output : true;
-      }
-
-      this.checkForSame(parentUid || ROOT, column);
-      this.updateItem(uid, column);
+      if (items.length) this.applyLayerToolToItems(layerId, items);
     }
+
+    if (!hasChanges) return;
+    this.canvas.isPreviewChanged = true;
+    this.updateLists();
+    this.handleOnSelect(false);
+    if (commitHistory) this.history.commit('Update laser settings');
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -981,32 +928,116 @@ export default class Work extends View {
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   handleUnselectAll() {
-    this.cutList.unselectAll();
+    this.runWithTreeSyncLock(() => this.cutList.unselectAll());
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   private handleOnSelect(scrollToSelection = true) {
-    this.cutList.clearSelection(ROOT, true);
-    if (scrollToSelection) this.cutList.updateSelection();
+    if (this.isTreeSyncLocked()) return;
 
     this.clearProps();
 
     const selectedItems = this.canvas.toolbox.select.selectedItems;
     if (!selectedItems || !selectedItems.length) {
+      this.elementSettings.setLaserControlsVisible(true);
+      this.syncTreeSelection([], false);
       this.updateTopTools(selectedItems);
       return;
     }
 
     this.initSnapper();
-    if (selectedItems.length) {
-      for (let i = 0; i < selectedItems.length; i++) {
-        const item = selectedItems[i];
-        this.cutList.addSelection(item.uid);
-      }
-    }
-    if (scrollToSelection) this.cutList.updateSelection();
+    const selectedLayerIds = this.getLayerIdsFromItems(selectedItems);
+    this.syncTreeSelection(selectedLayerIds, scrollToSelection);
+    const layerId = getLayerId(selectedItems[0]);
+    const layer = getLayerById(layerId);
+    this.canvas.setActiveLayer(layer.id, layer.color);
+    this.refreshPaletteSelection();
     this.fillProps(true);
+    this.elementSettings.setLaserControlsVisible(!isToolLayer(layerId));
+  }
+
+  private runWithTreeSyncLock(handler: () => void) {
+    this._treeSyncLock++;
+    try {
+      handler();
+    } finally {
+      this._treeSyncLock = Math.max(0, this._treeSyncLock - 1);
+    }
+  }
+
+  private isTreeSyncLocked() {
+    return this._treeSyncLock > 0;
+  }
+
+  private syncTreeSelection(selectedLayerIds: string[], scrollToSelection = true) {
+    if (!this.cutList || !this.cutList.items) return;
+    this.runWithTreeSyncLock(() => {
+      this.cutList.clearSelection(ROOT, true);
+      const seen = {};
+      for (let i = 0; i < selectedLayerIds.length; i++) {
+        const layerId = selectedLayerIds[i];
+        if (!layerId || seen[layerId]) continue;
+        seen[layerId] = true;
+        if (!this.cutList.items[layerId]) continue;
+        this.cutList.addSelection(layerId);
+      }
+      this.cutList.updateTree(false);
+      if (scrollToSelection) this.cutList.updateSelection();
+    });
+  }
+
+  private getLayerIdsFromItems(items: any[]) {
+    const layerIds = [];
+    const seen = {};
+    for (let i = 0; i < (items || []).length; i++) {
+      const item = items[i];
+      if (!item) continue;
+      const layerId = getLayerId(item);
+      if (!layerId || seen[layerId]) continue;
+      seen[layerId] = true;
+      layerIds.push(layerId);
+    }
+    return layerIds;
+  }
+
+  private getSelectedLayerIds() {
+    const selected = this.cutList.selected || [];
+    const layerIds = [];
+    const seen = {};
+    for (let i = 0; i < selected.length; i++) {
+      const uid = selected[i];
+      const item = this.cutList.items[uid];
+      if (!item || !item.layerId) continue;
+      if (seen[item.layerId]) continue;
+      seen[item.layerId] = true;
+      layerIds.push(item.layerId);
+    }
+    return layerIds;
+  }
+
+  private getItemsForLayer(layerId: string) {
+    const items = this.layerItemsMap[layerId];
+    if (Array.isArray(items)) return items;
+    const fallback = [];
+    const elements = this.canvas.elements || {};
+    const uids = Object.keys(elements);
+    for (let i = 0; i < uids.length; i++) {
+      const item = elements[uids[i]];
+      if (!item || !this.isListItem(item)) continue;
+      if (getLayerId(item) === layerId) fallback.push(item);
+    }
+    return fallback;
+  }
+
+  private getTargetLayerIdsForUid(uid: string) {
+    const selectedLayerIds = this.getSelectedLayerIds();
+    if (selectedLayerIds.includes(uid)) return selectedLayerIds;
+    const treeItem = this.cutList.items[uid];
+    if (treeItem && treeItem.layerId) return [treeItem.layerId];
+    const layer = getLayerById(uid);
+    if (layer && layer.id === uid) return [uid];
+    return [];
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1168,10 +1199,8 @@ export default class Work extends View {
 
     const sets: IElementSettings = {};
 
-    const mixedSettings =
-      (selectedItems[0].parent ? selectedItems[0].parent.laserSettings : null) || selectedItems[0].laserSettings;
-
-    const laserSettings = selectedItems.length === 1 ? selectedItems[0].laserSettings : mixedSettings;
+    const layerId = getLayerId(selectedItems[0]);
+    const laserSettings = this.getLayerTool(layerId);
     sets.name = selectedItems[0].uname;
     sets.speed = laserSettings.speed;
     sets.power = laserSettings.power;
@@ -1215,211 +1244,172 @@ export default class Work extends View {
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   updateLists() {
-    const previousOrder = this.cutList.getOrder ? this.cutList.getOrder() : null;
-    const orderMap = {};
-    if (previousOrder && previousOrder.length) {
-      for (let i = 0; i < previousOrder.length; i++) {
-        orderMap[previousOrder[i]] = i;
-      }
+    const projectLayerOrder = this.canvas?.objectsLayer?.data?.layerOrder;
+    if (Array.isArray(projectLayerOrder) && projectLayerOrder.length) {
+      this.layerOrder = projectLayerOrder.slice();
     }
+    if (!this.canvas.objectsLayer.data) this.canvas.objectsLayer.data = {};
+    this.canvas.objectsLayer.data.layerOrder = this.layerOrder.slice();
 
-    this.canvas.elements = [];
-
+    const nextElements = {};
     this.cutList.clear();
-    const elements = this.canvas.objectsLayer;
-    if (elements.children) this.addElement(elements.children, ROOT);
 
-    const selected = this.canvas.toolbox.select.selectionGroup;
+    const allItems = [];
+    const seen = {};
+    const collectItems = (item) => {
+      if (!item) return;
+      if (item.uid === SELECT) {
+        const selectedChildren = item.children || [];
+        for (let i = 0; i < selectedChildren.length; i++) collectItems(selectedChildren[i]);
+        return;
+      }
+      if (item.uid && seen[item.uid]) return;
+      if (item.uid) {
+        seen[item.uid] = true;
+        nextElements[item.uid] = item;
+        allItems.push(item);
+      }
+      const children = item.children || [];
+      for (let i = 0; i < children.length; i++) collectItems(children[i]);
+    };
 
-    if (selected && selected.children) this.addElement(selected.children, ROOT);
+    const rootChildren = (this.canvas.objectsLayer && this.canvas.objectsLayer.children) || [];
+    for (let i = 0; i < rootChildren.length; i++) collectItems(rootChildren[i]);
 
-    if (Object.keys(orderMap).length) this.cutList.applyOrder(orderMap);
+    const selectionChildren = (this.canvas.toolbox.select.selectionGroup && this.canvas.toolbox.select.selectionGroup.children) || [];
+    for (let i = 0; i < selectionChildren.length; i++) collectItems(selectionChildren[i]);
+
+    const layerBuckets = {};
+    for (let i = 0; i < allItems.length; i++) {
+      const child = allItems[i];
+      if (!this.isListItem(child)) continue;
+      this.ensureItemLayer(child);
+      child.opacity = this.getElementOpacity(child);
+      const layerId = getLayerId(child);
+      if (!layerBuckets[layerId]) layerBuckets[layerId] = [];
+      layerBuckets[layerId].push(child);
+    }
+
+    const usedLayers = this.layerOrder.filter((layerId) => layerBuckets[layerId] && layerBuckets[layerId].length);
+    const usedSet = {};
+    for (let i = 0; i < usedLayers.length; i++) usedSet[usedLayers[i]] = true;
+    const remaining = Object.keys(layerBuckets)
+      .filter((layerId) => !usedSet[layerId])
+      .sort((a, b) => getLayerById(a).index - getLayerById(b).index);
+    const orderedLayers = [...usedLayers, ...remaining];
+
+    this.layerItemsMap = {};
+    for (let i = 0; i < orderedLayers.length; i++) {
+      const layerId = orderedLayers[i];
+      const items = layerBuckets[layerId];
+      this.applyLayerToolToItems(layerId, items);
+      this.layerItemsMap[layerId] = items.slice();
+      const layerColumns = this.getLayerColumns(layerId, items);
+      const layerDef = getLayerById(layerId);
+      const label = isToolLayer(layerId) ? `Tool ${layerDef.id}` : layerDef.id;
+      this.cutList.addBin({
+        caption: `<span class="ec-layer-chip" style="background:${getLayerUiColor(layerDef.id, layerDef.color)}"></span>${label}`,
+        parent: ROOT,
+        kind: 'Layer',
+        uid: layerId,
+        layerId,
+        columns: layerColumns,
+      });
+    }
+
     this.cutList.updateTree();
-    this.icFoldsAll.enabled = Object.keys(this.cutList.itemsOrder).length > 1;
+    this.icFoldsAll.enabled = false;
+    const selectedItems = this.canvas.toolbox.select.selectedItems || [];
+    const selectedLayerIds = this.getLayerIdsFromItems(selectedItems);
+    this.syncTreeSelection(selectedLayerIds, false);
+    this.refreshPaletteSelection();
 
-    window[ELEMENTS] = this.canvas.elements;
+    this.canvas.elements = nextElements;
+    window[ELEMENTS] = nextElements;
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  addElement(children, parent) {
-    for (let i = 0; i < children.length; i++) {
-      const child = children[i];
-      if (!child.bounds.width || !child.bounds.height) {
-        continue;
-      }
-      if (child.uid === SELECT) {
-        continue;
-      }
-      if (child.uid) this.canvas.elements[child.uid] = child;
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-      let normalizedParent = child.currentParent;
-      if (normalizedParent && typeof normalizedParent === 'object') {
-        normalizedParent =
-          typeof normalizedParent.uid === 'string' && normalizedParent.uid !== SELECT ? normalizedParent.uid : null;
-      }
-      if (child.currentParent !== normalizedParent) {
-        child.currentParent = normalizedParent || null;
-      }
+  private isListItem(child) {
+    if (!child || !child.uid || child.uid === SELECT) return false;
+    if (!child.bounds || !child.bounds.width || !child.bounds.height) return false;
+    if (child.kind === E_KIND_CURVE) return false;
+    if (child.children && child.children.length) return false;
+    return child.kind !== E_KIND_GROUP;
+  }
 
-      const parentItem = child.parent;
-      const parentUid =
-        parentItem && typeof parentItem.uid === 'string' && parentItem.uid !== SELECT ? parentItem.uid : null;
+  private ensureItemLayer(child) {
+    if (!child.laserSettings) {
+      child.laserSettings = DeepCopy(DefaultLaserSettings);
+    }
+    if (typeof child.visible !== 'boolean') child.visible = true;
+    if (child.laserSettings.laserType === undefined) {
+      child.laserSettings.laserType = child.type === E_KIND_IMAGE ? ElementLaserType.Image : ElementLaserType.Line;
+    }
+    if (child.laserSettings.includeInFrame === undefined) child.laserSettings.includeInFrame = true;
+    const layer = ensureLayerData(child, this.canvas.currentLayerId || DEFAULT_LAYER_ID);
+    const layerTool = this.getLayerTool(layer.id);
+    child.laserSettings.speed = layerTool.speed;
+    child.laserSettings.power = layerTool.power;
+    child.laserSettings.passes = layerTool.passes;
+    child.laserSettings.air = layerTool.air;
+    child.laserSettings.laserType = layerTool.laserType;
+    child.laserSettings.includeInFrame = layerTool.includeInFrame;
+    child.laserSettings.output = isToolLayer(layer.id) ? false : !!layerTool.output;
+    child.visible = !!layerTool.visible;
+    this.applyVisualStyle(child);
+    if (child.kind === E_KIND_IMAGE) {
+      if (!window[IMAGES]) window[IMAGES] = [];
+      window[IMAGES][child.uid] = child;
+      if (!child.originalContext) ImagePreview(child);
+    }
+    return layer;
+  }
 
-      if (!parentItem || parentItem.uid !== SELECT) {
-        if (child.currentParent !== parentUid) {
-          child.currentParent = parentUid || null;
-        }
-      }
+  private applyVisualStyle(child) {
+    if (!child) return;
+    const strokeColor = getElementColor(child);
+    const isFill = child.laserSettings && child.laserSettings.laserType === ElementLaserType.Fill;
+    if (child.strokeColor !== undefined) child.strokeColor = strokeColor;
 
-      let treeParent = parent;
-      if (treeParent === ROOT && child.currentParent && this.cutList.items[child.currentParent]) {
-        treeParent = child.currentParent;
-      }
+    if (child.kind === E_KIND_TEXT) {
+      const fillColor = isFill ? strokeColor : null;
+      applyStrokeFill(child, strokeColor, fillColor);
+      return;
+    }
 
-      if (!child.laserSettings) {
-        child.laserSettings = DeepCopy(DefaultLaserSettings);
-      }
-      if (child.laserSettings.laserType === undefined) {
-        child.laserSettings.laserType = child.type === E_KIND_IMAGE ? ElementLaserType.Image : ElementLaserType.Line;
-      }
+    if (child.fillColor !== undefined) child.fillColor = isFill ? strokeColor : null;
+  }
 
-      const laserType = this.getType(child.laserSettings.laserType);
-      const laserParameters = this.getParameters(child);
-      const laserAir = this.getAir(child);
-      const laserOutput = this.getOutput(child);
-      child.opacity = child.laserSettings.output ? (window[CURRENT_MOD] === MOD_WORK ? 1 : PREVIEW_OPACITY) : 0;
-      if (child.kind === E_KIND_IMAGE) {
-        if (!window[IMAGES]) window[IMAGES] = [];
-        window[IMAGES][child.uid] = child;
-        if (!child.originalContext) {
-          ImagePreview(child);
-        }
-      }
-      if (child.kind === E_KIND_TEXT) {
-        const isFill = child.laserSettings.laserType === ElementLaserType.Fill;
-        const fillColor = isFill ? 'rgba(0,0,0,.5)' : null;
-        const strokeColor = child.sel
-          ? window[CURRENT_THEME].object.selected
-          : isFill
-          ? 'rgba(0,0,0,.5)'
-          : window[CURRENT_THEME].object.strokeColor;
-        child.fillColor = fillColor;
-        child.strokeColor = strokeColor;
-        applyStrokeFill(child, strokeColor, fillColor);
-      }
-      const columns = [
-        {
-          ...laserType,
-        },
-        {
-          ...laserParameters,
-        },
-        {
-          ...laserAir,
-        },
-        {
-          ...laserOutput,
-        },
-      ];
-      let color = '';
-      if (child.data.strokeColor)
-        color = `<span style="margin-right:0.5rem;min-width:1.5rem;background-color:${child.data.strokeColor}"></span>`;
-      const hasRenderableChildren = child.children && child.children.length && child.kind !== E_KIND_TEXT;
-      if (hasRenderableChildren) {
-        const papa = this.cutList.addBin({
-          caption: color + (child.uname || tr(E_KIND_GROUP)),
-          parent: treeParent,
-          kind: child.kind,
-          groupId: child.children[0].parent.uid,
-          uid: child.children[0].parent.uid,
-          columns,
-          changedColumn: child.laserSettings.changedColumn,
-        });
-        this.addElement(child.children, papa);
-      } else {
-        let icon = this.elIcons[child.kind];
-        if (!(child.uname || child.kind)) continue;
-        if (child.kind === E_KIND_GROUP)
-          this.cutList.addBin({
-            parent: treeParent,
-            caption: color + (child.uname || child.kind),
-            hint: child.kind,
-            uid: child.uid,
-            groupId: child.uid,
-            selected: child.sel,
-            columns,
-          });
-        else {
-          this.cutList.addItem({
-            icon,
-            parent: treeParent,
-            caption: color + (child.uname || child.kind),
-            hint: child.kind,
-            uid: child.uid,
-            selected: child.sel,
-            columns,
-          });
-        }
-      }
+  private getLayerColumns(layerId, items) {
+    const layerTool = this.getLayerTool(layerId);
+    if (isToolLayer(layerId)) {
+      return [this.getFrameToggle(layerTool), this.getVisibility(layerTool)];
+    }
+    return [
+      this.getParameters(layerTool),
+      this.getOutput(layerTool),
+      this.getType(layerTool.laserType || ElementLaserType.Line),
+      this.getVisibility(layerTool),
+      this.getAir(layerTool),
+    ];
+  }
+
+  private refreshPaletteSelection() {
+    const ids = Object.keys(this.layerButtons || {});
+    const currentId = this.canvas.currentLayerId || DEFAULT_LAYER_ID;
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const button = this.layerButtons[id];
+      if (!button) continue;
+      if (id === currentId) button.classList.add('active');
+      else button.classList.remove('active');
     }
   }
 
-  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  private updateItem(uid, column) {
-    const child = this.canvas.elements[uid];
-    const laserType = this.getType(child.laserSettings.laserType);
-    const laserParameters = this.getParameters(child);
-    const laserAir = this.getAir(child);
-    const laserOutput = this.getOutput(child);
-
-    if (column === 0) {
-      this.cutList.updateColumn({ uid, column, data: { ...laserType } });
-      const isFill = child.laserSettings.laserType === ElementLaserType.Fill;
-      const fillColor =
-        child.laserSettings.laserType !== ElementLaserType.Mixed ? (isFill ? 'rgba(0,0,0,.5)' : null) : undefined;
-      if (fillColor !== undefined) {
-        child.fillColor = fillColor;
-      }
-
-      let strokeColor;
-      if (child.kind !== E_KIND_GROUP) {
-        strokeColor = child.sel
-          ? window[CURRENT_THEME].object.selected
-          : isFill
-          ? 'rgba(0,0,0,.5)'
-          : window[CURRENT_THEME].object.strokeColor;
-        child.strokeColor = strokeColor;
-      }
-
-      if (child.kind === E_KIND_TEXT) {
-        const textStroke =
-          strokeColor !== undefined
-            ? strokeColor
-            : child.sel
-            ? window[CURRENT_THEME].object.selected
-            : isFill
-            ? 'rgba(0,0,0,.5)'
-            : window[CURRENT_THEME].object.strokeColor;
-        applyStrokeFill(child, textStroke, fillColor);
-      }
-    }
-
-    if (column === 1) this.cutList.updateColumn({ uid, column, data: { ...laserParameters } });
-
-    if (column === 2) this.cutList.updateColumn({ uid, column, data: { ...laserAir } });
-
-    if (column === 3) {
-      this.cutList.updateColumn({ uid, column, data: { ...laserOutput } });
-      child.opacity = child.laserSettings.output;
-    }
-  }
-
-  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  private getParameters(child) {
-    const laserSettings = child.laserSettings;
+  private getParameters(laserSettings) {
     return {
       html: `<span style="pointer-events:none"><span ls="speed">${laserSettings.speed} </span>/<span ls="power"> ${laserSettings.power} </span>/<span ls="passes"> ${laserSettings.passes} </span></span>`,
       hint: `${tr('Speed')} / ${tr('Power')} / ${tr('Pass Count')}`,
@@ -1436,14 +1426,9 @@ export default class Work extends View {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  private getAir(child) {
-    const laserSettings = child.laserSettings;
-    let op = laserSettings.air;
-    let info = `(${op ? tr('On') : tr('Off')})`;
-    if (child.children && child.children.length && laserSettings.changedColumn && laserSettings.changedColumn[LS_AIR]) {
-      info = `(${tr('mixed')})`;
-      op = true;
-    }
+  private getAir(laserSettings) {
+    const op = !!laserSettings.air;
+    const info = `(${op ? tr('On') : tr('Off')})`;
     return {
       html: op ? '<i class="fa-solid fa-wind"></i>' : '<i style="opacity:0.3" class="fa-solid fa-wind"></i>',
       hint: `${tr('Air')} ${info}`,
@@ -1452,34 +1437,58 @@ export default class Work extends View {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  private getOutput(child) {
-    const laserSettings = child.laserSettings;
-    let op = laserSettings.output;
-    let info = `(${op ? tr('On') : tr('Off')})`;
-    if (
-      child.children &&
-      child.children.length &&
-      laserSettings.changedColumn &&
-      laserSettings.changedColumn[LS_OUTPUT]
-    ) {
-      info = `(${tr('mixed')})`;
-      op = true;
-    }
+  private getVisibility(source) {
+    const visible = source?.visible !== false;
     return {
-      html: op ? '<i class="fa-regular fa-eye"></i>' : '<i style="opacity:0.3" class="fa-regular fa-eye"></i>',
-      hint: `Output ${info}`,
+      html: visible
+        ? '<i class="fa-regular fa-eye"></i>'
+        : '<i style="opacity:0.3" class="fa-regular fa-eye-slash"></i>',
+      hint: `${tr('Visibility')} (${visible ? tr('On') : tr('Off')})`,
     };
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+  private getOutput(laserSettings) {
+    const op = !!laserSettings.output;
+    const info = `(${op ? tr('On') : tr('Off')})`;
+    return {
+      html: op ? '<i class="fa-solid fa-fire"></i>' : '<i style="opacity:0.3" class="fa-solid fa-fire"></i>',
+      hint: `Output ${info}`,
+    };
+  }
+
+  private getFrameToggle(source) {
+    const includeInFrame = source?.includeInFrame !== false;
+    return {
+      html: includeInFrame
+        ? '<i class="fa-regular fa-object-group"></i>'
+        : '<i style="opacity:0.3" class="fa-regular fa-object-group"></i>',
+      hint: `${tr('Include In Frame')} (${includeInFrame ? tr('On') : tr('Off')})`,
+    };
+  }
+
+  private getElementOpacity(child) {
+    if (child.visible === false) return 0;
+    if (isToolLayer(getLayerId(child))) return NON_OUTPUT_OPACITY;
+    if (!child.laserSettings || !child.laserSettings.output) return NON_OUTPUT_OPACITY;
+    return window[CURRENT_MOD] === MOD_WORK ? 1 : PREVIEW_OPACITY;
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
   getFrame() {
-    if (!this.cutList || !this.cutList.orderedItems.length) return { elements: 0 };
+    const elementsMap = this.canvas?.elements || {};
+    const uids = Object.keys(elementsMap);
+    if (!uids.length) return { elements: 0 };
     this.frame = { l: 1e6, r: -1e6, t: 1e6, b: -1e6 };
     let elements = 0;
-    for (let i = 0; i < this.cutList.orderedItems.length; i++) {
-      const child = this.canvas.elements[this.cutList.orderedItems[i]];
-      if (!child.laserSettings.output) continue;
+    for (let i = 0; i < uids.length; i++) {
+      const uid = uids[i];
+      const child = elementsMap[uid];
+      if (!this.isListItem(child)) continue;
+      if (!child || child.visible === false) continue;
+      if (child.laserSettings.includeInFrame === false) continue;
       elements++;
       this.frame = {
         l: Math.min(this.frame.l, child.bounds.left),
