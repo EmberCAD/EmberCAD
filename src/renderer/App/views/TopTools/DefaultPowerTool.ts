@@ -63,6 +63,11 @@ export default class DefaultPowerTools {
     this.hideTextActions();
   }
 
+  hideNoSelection() {
+    this.label.hide();
+    this.hideTextActions();
+  }
+
   showTextActions() {
     this.label.hide();
     this.separator.show();

@@ -1112,7 +1112,8 @@ export default class Work extends View {
 
     this._topTools.showView(this.defaultTopTools);
     this._topToolsAux.showView(this.defaultPowerTopTools);
-    this.defaultPowerTopTools.showNoSelection();
+    if (selectedItems.length) this.defaultPowerTopTools.hideNoSelection();
+    else this.defaultPowerTopTools.showNoSelection();
 
     this.defaultTopTools.hideGrouping();
     this.designerIcons.hideExtraTools();
