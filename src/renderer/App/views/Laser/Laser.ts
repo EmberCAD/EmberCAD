@@ -648,6 +648,18 @@ export default class Laser extends View {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+  resetPreparedPreview() {
+    this.clearGCode();
+    this.transport.hide();
+    this.tracePreview.text = PREPARE_JOB;
+    this.tracePreview.enabled = true;
+    const ctx = this.laserCanvas?.ctxPreview;
+    if (ctx) ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    this.buttonsEnabler(ButtonEnabler.Stop);
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
   clearGCode() {
     this.gcode.clear();
     this.laserCanvas.laserCursorPosition = { x: 0, y: 0 };

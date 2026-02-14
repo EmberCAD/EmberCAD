@@ -471,6 +471,10 @@ export default class App {
     const proceed = await this.confirmDiscardChanges('creating a new project');
     if (!proceed) return;
 
+    // New project should always return to Designer and clear previous Laser preview artifacts.
+    this.appSwitch.select(0);
+    if (this.viewLaser?.resetPreparedPreview) this.viewLaser.resetPreparedPreview();
+    this.viewWork.canvas?.imagesVisible?.(true);
     this.viewWork.handleUnselectAll();
     await this.projectManager.createNewProject();
     this.afterProjectLoaded('Initial state');

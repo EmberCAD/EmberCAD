@@ -635,6 +635,7 @@ export default class Work extends View {
       const selectedItems = this.canvas.toolbox.select.selectedItems;
       if (!selectedItems || !selectedItems.length) return;
       if (this.canvas.mouseDown) {
+        this.canvas.isPreviewChanged = true;
         this.fillProps();
       }
     };
