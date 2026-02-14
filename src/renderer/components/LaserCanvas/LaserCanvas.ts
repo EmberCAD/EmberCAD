@@ -820,9 +820,11 @@ export default class LaserCanvas {
   }
 
   private createTextCarrier(proxy: any, textSettings: any, layerId: string, layerColor: string, linkId: string) {
-    const b = proxy?.bounds;
-    const rect = [b?.x || proxy.position.x, b?.y || proxy.position.y, Math.max(b?.width || 1, 1), Math.max(b?.height || 1, 1)];
-    const carrier = new this.paper.Path.Rectangle(rect);
+    const center = proxy?.position || new this.paper.Point(0, 0);
+    const carrier = new this.paper.Path.Circle({
+      center,
+      radius: 0.1,
+    });
     carrier.kind = E_KIND_TEXT;
     carrier.uid = codec64.uId('text_carrier_');
     carrier.userGroup = false;
@@ -922,6 +924,19 @@ export default class LaserCanvas {
       if (carrier.parent !== root) root.addChild(carrier);
     }
     carrier.data.textSettings = DeepCopy(proxy.data.textSettings || carrier.data.textSettings || {});
+    // Normalize legacy carriers that may keep stale/oversized geometry from older grouping behavior.
+    // Carrier is metadata-only and should not affect selection bounds.
+    if (carrier.removeSegments) {
+      carrier.removeSegments();
+      const marker = new this.paper.Path.Circle({
+        center: proxy.position,
+        radius: 0.1,
+        insert: false,
+      });
+      carrier.addSegments(marker.segments);
+      carrier.closed = true;
+      marker.remove();
+    }
     carrier.position = proxy.position;
     carrier.locked = false;
     this.applyLayerToElement(carrier, layerId, layerColor, false);
