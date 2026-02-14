@@ -1363,16 +1363,9 @@ export default class LaserCanvas {
     }
 
     element.position = this.paper.view.viewToProject(x, y);
-
-    const selectableChildren = element.rasterized ? [element] : (element.children || []).slice();
-    this.toolbox.select.selectedItems = selectableChildren;
-    if (selectableChildren.length > 1) this.toolbox.select.group();
-    const grouped = this.toolbox.select.selectedItems && this.toolbox.select.selectedItems[0];
-    if (grouped) {
-      this.assignImportedLayers(grouped);
-    } else {
-      this.applyLayerToElement(element, this.currentLayerId, this.currentLayerFill);
-    }
+    // Apply import layer mapping directly on the imported root element.
+    // Using temporary selection-group wrappers here breaks immediate burn/fill behavior.
+    this.assignImportedLayers(element);
   }
 
   setActiveLayer(layerId: string, layerColor?: string) {
