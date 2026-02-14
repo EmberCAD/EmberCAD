@@ -698,6 +698,10 @@ export default class Select {
       this.unselect(item);
     }
     this.selectedItems = [];
+    this.selectionGroup.visible = false;
+    this.setupSelection();
+    if (typeof this.onUpdateSelection === 'function') this.onUpdateSelection([]);
+    if (typeof this.onUnselectAll === 'function') this.onUnselectAll();
   }
 
   private unselectChildren(item: any) {
