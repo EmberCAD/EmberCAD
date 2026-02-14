@@ -1379,7 +1379,9 @@ export default class Work extends View {
     if (!child || !child.uid || child.uid === SELECT) return false;
     if (isTextProxy(child)) return false;
     if (isTextCarrier(child)) return false;
-    if (!child.bounds || !child.bounds.width || !child.bounds.height) return false;
+    if (child.kind !== E_KIND_IMAGE) {
+      if (!child.bounds || !child.bounds.width || !child.bounds.height) return false;
+    }
     if (child.kind === E_KIND_CURVE) return false;
     if (child.children && child.children.length && !isTextRoot(child) && child.kind !== E_KIND_TEXT && !isTextProxy(child))
       return false;

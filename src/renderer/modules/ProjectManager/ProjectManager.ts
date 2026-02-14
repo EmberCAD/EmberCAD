@@ -5,6 +5,7 @@ import { DeepCopy } from '../../lib/api/cherry/api';
 import { E_KIND_IMAGE, E_KIND_VECTOR } from '../../components/LaserCanvas/CanvasElement';
 import { ELEMENTS, IMAGES, OBJECTS_LAYER, VECTORS } from '../../components/LaserCanvas/LaserCanvas';
 import { SELECT } from '../../components/LaserCanvas/Tools/Select';
+import { getLayerColor, getLayerId, setLayerData } from '../layers';
 
 const RECENT_PROJECTS_KEY = 'embercad_recent_projects';
 const PROJECT_FORMAT = 'ecad-v2';
@@ -21,6 +22,8 @@ type ElementMeta = {
   type?: any;
   parentUid?: string | null;
   data?: any;
+  layerId?: string;
+  layerColor?: string;
 };
 
 type SerializedProject = {
@@ -434,6 +437,8 @@ export default class ProjectManager {
           type: item.type,
           parentUid: this.resolveParentUid(item, parent),
           data: item.data ? DeepCopy(item.data) : undefined,
+          layerId: getLayerId(item),
+          layerColor: getLayerColor(item),
         };
       }
 
@@ -478,6 +483,7 @@ export default class ProjectManager {
         item.laserSettings = info.laserSettings ? DeepCopy(info.laserSettings) : item.laserSettings;
         item.sel = false;
         item.currentParent = typeof resolvedParentUid === 'string' ? resolvedParentUid : null;
+        if (info.layerId) setLayerData(item, info.layerId, info.layerColor);
       }
 
       if (item.uid) {
