@@ -970,9 +970,14 @@ export default class LaserCanvas {
     const top = Number(textSettings.top) || 0;
     const mx = this.mirrorScalars.x;
     const my = this.mirrorScalars.y;
+    const b = textItem?.bounds;
+    const leftEdge = b ? b.left : textItem.position.x;
+    const rightEdge = b ? b.right : textItem.position.x;
+    const topEdge = b ? b.top : textItem.position.y;
+    const bottomEdge = b ? b.bottom : textItem.position.y;
     return {
-      x: mx < 0 ? textItem.position.x + left : textItem.position.x - left,
-      y: my < 0 ? textItem.position.y + top : textItem.position.y - top,
+      x: mx < 0 ? rightEdge - left : leftEdge - left,
+      y: my < 0 ? bottomEdge - top : topEdge - top,
     };
   }
 
