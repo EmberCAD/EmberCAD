@@ -367,10 +367,27 @@ export default class Select {
 
       let inside = window[OBJECTS_LAYER].getItems(option);
       let insideSel = this.selectionGroup.getItems(option);
+      const seen = {};
+      const resolveRectSelectionItem = (raw: any) => {
+        let item = raw;
+        if (!item) return null;
+        if (item.uid === SELECT) return null;
+        if (isTextCarrier(item)) return null;
+        if (isTextProxy(item) && item?.data?.textRootUid && window[ELEMENTS]) {
+          const root = window[ELEMENTS][item.data.textRootUid];
+          if (root && isTextRoot(root)) item = root;
+        }
+        if (!item || item.uid === SELECT) return null;
+        if (item.visible === false || item.opacity === 0) return null;
+        if (item.uid && seen[item.uid]) return null;
+        if (item.uid) seen[item.uid] = true;
+        return item;
+      };
       if (inside.length) {
         with_event = SELECT_EVENT;
         for (let i = 0; i < inside.length; i++) {
-          const item = inside[i];
+          const item = resolveRectSelectionItem(inside[i]);
+          if (!item) continue;
 
           if (
             !item.userGroup &&
@@ -391,7 +408,8 @@ export default class Select {
         with_event = SELECT_EVENT;
 
         for (let i = 0; i < insideSel.length; i++) {
-          const item = insideSel[i];
+          const item = resolveRectSelectionItem(insideSel[i]);
+          if (!item) continue;
 
           if (!item.type || item.name === CENTER_GRID || item.name === OBJECTS_LAYER || item.inGroup) continue;
 
