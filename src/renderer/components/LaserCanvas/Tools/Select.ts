@@ -601,7 +601,7 @@ export default class Select {
     window[OBJECTS_LAYER].addChild(this.selectionGroup);
 
     const item = this.selectedItems[0];
-    const items = item.children;
+    const items = (item.children || []).slice();
     const parentGroup = item.currentParent;
 
     if (!item.userGroup || !items || !items.length) return;
@@ -620,13 +620,12 @@ export default class Select {
       child.type = 'ungroup';
       child.currentParent = parentGroup;
       child.data.prevRotation = item.data.rotation;
-      this.selectionGroup.addChildren(child);
+      this.selectionGroup.addChild(child);
       ungroup.push(child);
     }
     ungroup.sel = true;
     ungroup.currentParent = parentGroup;
 
-    this.selectionGroup.addChildren(ungroup);
     this.selectedItems = ungroup;
     const rem = item.remove();
     if (typeof this.onUngroup === 'function') this.onUngroup(ungroup);
