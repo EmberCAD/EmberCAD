@@ -161,14 +161,19 @@ export default class ProjectManager {
 
     try {
       const layer = this.laserCanvas.objectsLayer;
-      const children = this.getChildren(layer);
-      const payload: SerializedProject = {
-        format: PROJECT_FORMAT,
-        childrenJSON: children.map((item: any) => item.exportJSON()),
-        metadata: this.captureMetadata(layer),
-        layerData: layer?.data ? DeepCopy(layer.data) : {},
-      };
-      return JSON.stringify(payload);
+      const restoreSelectionGroup = this.detachSelectionGroup();
+      try {
+        const children = this.getChildren(layer);
+        const payload: SerializedProject = {
+          format: PROJECT_FORMAT,
+          childrenJSON: children.map((item: any) => item.exportJSON()),
+          metadata: this.captureMetadata(layer),
+          layerData: layer?.data ? DeepCopy(layer.data) : {},
+        };
+        return JSON.stringify(payload);
+      } finally {
+        if (restoreSelectionGroup) restoreSelectionGroup();
+      }
     } catch (error) {
       throw new Error(`Failed to serialize project: ${error?.message || error}`);
     }
@@ -497,5 +502,44 @@ export default class ProjectManager {
     window[ELEMENTS] = elements;
     window[IMAGES] = images;
     window[VECTORS] = vectors;
+  }
+
+  private detachSelectionGroup() {
+    const select = this.laserCanvas?.toolbox?.select;
+    const selectionGroup = select?.selectionGroup;
+    if (!selectionGroup || !selectionGroup.parent) return null;
+
+    const parent = selectionGroup.parent;
+    const index =
+      typeof selectionGroup.index === 'number'
+        ? selectionGroup.index
+        : parent.children.indexOf(selectionGroup);
+
+    const selectionChildren = selectionGroup.children ? selectionGroup.children.slice() : [];
+    const placements: Array<{ child: any; parent: any }> = [];
+
+    for (let i = 0; i < selectionChildren.length; i++) {
+      const child = selectionChildren[i];
+      if (!child) continue;
+      const parentUid = typeof child.currentParent === 'string' ? child.currentParent : null;
+      let targetParent = parentUid && this.laserCanvas?.elements ? this.laserCanvas.elements[parentUid] : null;
+      if (!targetParent || targetParent.uid === SELECT) targetParent = window[OBJECTS_LAYER];
+      child.remove();
+      targetParent.addChild(child);
+      placements.push({ child, parent: targetParent });
+    }
+
+    selectionGroup.remove();
+
+    return () => {
+      for (let i = placements.length - 1; i >= 0; i--) {
+        const child = placements[i].child;
+        if (!child) continue;
+        if (child.parent) child.remove();
+        selectionGroup.addChild(child);
+      }
+      if (!parent.children || !parent.insertChild) return;
+      parent.insertChild(index, selectionGroup);
+    };
   }
 }
