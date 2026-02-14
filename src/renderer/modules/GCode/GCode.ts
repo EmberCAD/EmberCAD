@@ -521,9 +521,9 @@ export default class GCode {
       if (params && params.passes) passes = params.passes;
 
       if (kind !== E_KIND_IMAGE) {
-        const shouldRasterFill = isFill && (isText || !item.userGroup || (item.userGroup && !item.currentParent));
-
-        if (shouldRasterFill) {
+        // Fill mode should consistently rasterize non-image geometry.
+        // `currentParent`/group flags are selection-state dependent and can block fill unexpectedly.
+        if (isFill) {
           try {
             this.GCodeShape = FillToGcode(item) || [];
           } catch (error) {
