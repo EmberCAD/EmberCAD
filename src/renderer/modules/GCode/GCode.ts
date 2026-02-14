@@ -87,7 +87,15 @@ export default class GCode {
     const collect = (child) => {
       if (!child || child.visible === false) return;
       if (isTextCarrier(child)) return;
-      if (child.children && child.children.length) {
+      const hasChildren = !!(child.children && child.children.length);
+      const laserType = child?.laserSettings?.laserType;
+      const isFillContainer =
+        hasChildren &&
+        laserType === ElementLaserType.Fill &&
+        child.kind !== E_KIND_IMAGE &&
+        child.kind !== E_KIND_TEXT;
+
+      if (hasChildren && !isFillContainer) {
         for (let i = 0; i < child.children.length; i++) collect(child.children[i]);
       }
       if (isTextRoot(child)) return;
@@ -97,7 +105,7 @@ export default class GCode {
       const layerVisible = layerTool ? layerTool.visible !== false : child.visible !== false;
       if (!child.laserSettings || !outputEnabled || !layerVisible) return;
       if (isToolLayer(layerId)) return;
-      if (child.children && child.children.length && child.kind !== E_KIND_TEXT && child.kind !== E_KIND_IMAGE) return;
+      if (hasChildren && !isFillContainer && child.kind !== E_KIND_TEXT && child.kind !== E_KIND_IMAGE) return;
       if (!buckets[layerId]) buckets[layerId] = [];
       buckets[layerId].push(child);
     };
