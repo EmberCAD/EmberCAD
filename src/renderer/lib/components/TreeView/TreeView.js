@@ -133,11 +133,11 @@ class TreeView extends Component {
     this.onDrop = (e) => {
       let uid = e.state.uid;
       this.removeDropIndicator();
-      if (!uid) return;
       const data = JSON.parse(e.event.dataTransfer.getData('text'));
 
       if (!uid && e.type === 'TreeView') uid = ROOT;
       if (!uid || this.currentCover === FORBIDDEN) return;
+      if (uid !== ROOT && !this.items[uid]) uid = ROOT;
 
       if (uid !== ROOT && this.items[uid].type !== BIN && this.currentCover === ON) {
         uid = this.items[uid].parent;
@@ -455,16 +455,35 @@ class TreeView extends Component {
   }
 
   reorder(dropUid) {
-    const parent =
-      this.currentCover === BOTTOM && this.items[dropUid].type === BIN ? dropUid : this.items[dropUid].parent;
+    const dropItem = dropUid && dropUid !== ROOT ? this.items[dropUid] : null;
+    const parent = dropItem && dropItem.parent ? dropItem.parent : ROOT;
 
-    let uids = this.itemsOrder[parent].filter((item) => !this.selected.includes(item));
+    if (!this.itemsOrder[parent]) this.itemsOrder[parent] = [];
+    if (!this.selected || !this.selected.length) return;
 
-    const itemIndex = uids.indexOf(dropUid);
-    const insertIndex = itemIndex + (this.currentCover === BOTTOM ? 1 : 0);
+    // Remove dragged entries from all parent buckets first to avoid duplicates.
+    const parents = Object.keys(this.itemsOrder);
+    for (let i = 0; i < parents.length; i++) {
+      const p = parents[i];
+      const list = this.itemsOrder[p];
+      if (!Array.isArray(list)) continue;
+      this.itemsOrder[p] = list.filter((item) => !this.selected.includes(item));
+    }
 
-    uids.splice(insertIndex, 0, ...this.selected);
+    // Reparent moved items to the resolved target parent.
+    for (let i = 0; i < this.selected.length; i++) {
+      const uid = this.selected[i];
+      if (!this.items[uid]) continue;
+      this.items[uid].parent = parent;
+    }
 
+    let uids = this.itemsOrder[parent] || [];
+    const itemIndex = dropUid && dropUid !== ROOT ? uids.indexOf(dropUid) : -1;
+    let insertIndex = itemIndex + (this.currentCover === BOTTOM ? 1 : 0);
+    if (itemIndex < 0) insertIndex = uids.length;
+    insertIndex = Math.max(0, Math.min(insertIndex, uids.length));
+
+    uids.splice(insertIndex, 0, ...this.selected.filter((uid) => !!this.items[uid]));
     this.itemsOrder[parent] = uids;
 
     this.updateTree(false);
