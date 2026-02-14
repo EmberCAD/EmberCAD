@@ -687,6 +687,7 @@ export default class Work extends View {
       this.runWithTreeSyncLock(() => this.cutList.unselectAll());
 
       this.clearProps();
+      this.updateTopTools([]);
     };
 
     this.canvas.onEndEdit = (el) => {
