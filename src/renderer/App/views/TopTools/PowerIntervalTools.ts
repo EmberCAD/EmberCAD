@@ -95,6 +95,20 @@ export default class PowerIntervalTools {
     }
   }
 
+  powerOptionsVisible(op: boolean) {
+    if (op) {
+      this.lPower.show();
+      this.constantPower.show();
+      this.minPower.show();
+      this.maxPower.show();
+      return;
+    }
+    this.lPower.hide();
+    this.constantPower.hide();
+    this.minPower.hide();
+    this.maxPower.hide();
+  }
+
   events() {
     this.constantPower.onChanged = () => {
       this.update();
@@ -187,6 +201,7 @@ export default class PowerIntervalTools {
   /////////////////////////////////////////////////////////////////////
 
   update() {
+    if (!this._element || !this._element.laserSettings) return;
     this._element.laserSettings.constantPower = this.constantPower.checked;
     this._element.laserSettings.minPower = Number(this.minPower.input.text);
     this._element.laserSettings.power = Number(this.maxPower.input.text);

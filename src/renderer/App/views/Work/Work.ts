@@ -1135,6 +1135,9 @@ export default class Work extends View {
       }
       if (selectedItem.kind === E_KIND_IMAGE) {
         this._topTools.showView(this.imageTools);
+        if (this.imageTools?.powerIntervalTools) {
+          this._topToolsAux.showView(this.imageTools.powerIntervalTools);
+        }
         this.imageTools.element = selectedItem;
       }
       if (selectedItem.kind === E_KIND_TEXT || textSelected) {

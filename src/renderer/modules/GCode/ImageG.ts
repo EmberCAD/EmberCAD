@@ -116,8 +116,9 @@ export const ImagePreview = (element: any, refresh = false) => {
   if (!element.width || !element.height) return;
   if (!element.canvas.width || !element.canvas.height) return;
   const dither = element.laserSettings.image.dither;
+  const negative = !!element?.laserSettings?.image?.negative;
 
-  if ((dither === 'Original' && element.originalContext) || refresh) {
+  if (((dither === 'Original' && element.originalContext && !negative) || refresh)) {
     if (
       !element.originalContext ||
       !element.originalContext.canvas ||

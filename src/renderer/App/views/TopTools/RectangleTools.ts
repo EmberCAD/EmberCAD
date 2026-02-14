@@ -267,6 +267,9 @@ export default class RectangleTools {
   set element(element) {
     this._element = element;
     this.powerIntervalTools.element = element;
+    if (this.powerIntervalTools && typeof this.powerIntervalTools.powerOptionsVisible === 'function') {
+      this.powerIntervalTools.powerOptionsVisible(true);
+    }
 
     this.fillProps();
   }

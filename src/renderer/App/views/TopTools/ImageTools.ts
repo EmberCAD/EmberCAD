@@ -136,15 +136,10 @@ export default class ImageTools {
   /////////////////////////////////////////////////////////////////////
 
   private update(isChanged = true) {
-    if (!isChanged && this.dither.itemIndex === 0) this.dither.itemIndex = 1;
-
     if (isChanged) {
       this._element.laserSettings.fill.lineInterval = Number(this.powerIntervalTools.interval.input.text) || 0.1;
       this._element.laserSettings.fill.linesPerInch = Number(this.powerIntervalTools.dpiOut.input.text) || 127;
       this._element.laserSettings.image.dither = this.dither.items[this.dither.itemIndex];
-      this._element.laserSettings.constantPower = this.powerIntervalTools.constantPower.checked;
-      this._element.laserSettings.minPower = Number(this.powerIntervalTools.minPower.input.text);
-      this._element.laserSettings.power = Number(this.powerIntervalTools.maxPower.input.text);
       this._element.laserSettings.fill.overscan = this.powerIntervalTools.overscan.checked;
       this._element.laserSettings.fill.overscanValue = Number(this.powerIntervalTools.overscanValue.input.text) || 2.5;
       this._element.laserSettings.image.negative = this.negative.checked;
@@ -214,6 +209,12 @@ export default class ImageTools {
     } else {
       this.update(false);
     }
+    if (this.powerIntervalTools && typeof this.powerIntervalTools.fillOptionsVisible === 'function') {
+      this.powerIntervalTools.fillOptionsVisible(true);
+    }
+    if (this.powerIntervalTools && typeof this.powerIntervalTools.powerOptionsVisible === 'function') {
+      this.powerIntervalTools.powerOptionsVisible(false);
+    }
     this.powerIntervalTools.element = element;
   }
 
@@ -224,6 +225,12 @@ export default class ImageTools {
   /////////////////////////////////////////////////////////////////////
 
   resetImage() {
+    if (this.powerIntervalTools && typeof this.powerIntervalTools.fillOptionsVisible === 'function') {
+      this.powerIntervalTools.fillOptionsVisible(false);
+    }
+    if (this.powerIntervalTools && typeof this.powerIntervalTools.powerOptionsVisible === 'function') {
+      this.powerIntervalTools.powerOptionsVisible(true);
+    }
     this._element = undefined;
   }
 
