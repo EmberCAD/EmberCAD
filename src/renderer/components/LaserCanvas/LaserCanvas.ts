@@ -1345,8 +1345,11 @@ export default class LaserCanvas {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  private initPosition(element: CanvasVector | CanvasImage, e?) {
-    this.elements[element.uid] = element;
+  private initPosition(elementInput: any, e?) {
+    const element = elementInput && elementInput.element ? elementInput.element : elementInput;
+    if (!element) return;
+    if (!element.uid && elementInput?.uid) element.uid = elementInput.uid;
+    if (element.uid) this.elements[element.uid] = element;
 
     let x = this.workingArea.width / 2;
     let y = this.workingArea.height / 2;
@@ -1360,8 +1363,10 @@ export default class LaserCanvas {
     }
 
     element.position = this.paper.view.viewToProject(x, y);
-    this.toolbox.select.slectedItems = element.rasterized ? element : element.element.children;
-    this.toolbox.select.group();
+
+    const selectableChildren = element.rasterized ? [element] : (element.children || []).slice();
+    this.toolbox.select.selectedItems = selectableChildren;
+    if (selectableChildren.length > 1) this.toolbox.select.group();
     const grouped = this.toolbox.select.selectedItems && this.toolbox.select.selectedItems[0];
     if (grouped) {
       this.assignImportedLayers(grouped);
