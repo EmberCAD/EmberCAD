@@ -203,19 +203,17 @@ export default class ImageTools {
   /////////////////////////////////////////////////////////////////////
 
   set element(element) {
-    if (!this._element) {
-      this._element = element;
-      this.update(false);
-    } else {
-      this.update(false);
-    }
+    this._element = element;
+    this.powerIntervalTools.element = element;
+
     if (this.powerIntervalTools && typeof this.powerIntervalTools.fillOptionsVisible === 'function') {
       this.powerIntervalTools.fillOptionsVisible(true);
     }
     if (this.powerIntervalTools && typeof this.powerIntervalTools.powerOptionsVisible === 'function') {
       this.powerIntervalTools.powerOptionsVisible(false);
     }
-    this.powerIntervalTools.element = element;
+
+    this.update(false);
   }
 
   get element() {
