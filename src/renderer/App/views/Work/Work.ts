@@ -1389,10 +1389,14 @@ export default class Work extends View {
     if (child.kind === E_KIND_CURVE) return false;
     if (child.children && child.children.length) {
       const allowComposite =
-        isTextRoot(child) || child.kind === E_KIND_TEXT || child.kind === E_KIND_VECTOR || child.kind === E_KIND_IMAGE;
+        isTextRoot(child) ||
+        child.kind === E_KIND_TEXT ||
+        child.kind === E_KIND_VECTOR ||
+        child.kind === E_KIND_IMAGE ||
+        child.kind === E_KIND_GROUP;
       if (!allowComposite) return false;
     }
-    return child.kind !== E_KIND_GROUP;
+    return true;
   }
 
   private ensureItemLayer(child) {
