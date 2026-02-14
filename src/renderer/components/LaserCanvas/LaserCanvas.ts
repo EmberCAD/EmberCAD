@@ -1451,6 +1451,13 @@ export default class LaserCanvas {
     const layer = getLayerById(layerId);
     const color = layerColor || layer.color;
 
+    if (!item.laserSettings) {
+      item.laserSettings = DeepCopy(DefaultLaserSettings);
+      if (item.kind === E_KIND_IMAGE) item.laserSettings.laserType = 4;
+    }
+    if (item.laserSettings.output === undefined) item.laserSettings.output = !layer.tool;
+    if (item.laserSettings.includeInFrame === undefined) item.laserSettings.includeInFrame = true;
+
     ensureLayerData(item, layer.id);
     setLayerData(item, layer.id, color);
 
