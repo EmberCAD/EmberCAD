@@ -1346,7 +1346,19 @@ export default class LaserCanvas {
   /////////////////////////////////////////////////////////////////////////////
 
   private initPosition(elementInput: any, e?) {
-    const element = elementInput && elementInput.element ? elementInput.element : elementInput;
+    let element = elementInput && elementInput.element ? elementInput.element : elementInput;
+    const candidateVector = elementInput && elementInput.vector ? elementInput.vector : null;
+    if (
+      candidateVector &&
+      element &&
+      element !== candidateVector &&
+      (!element.bounds || !element.bounds.width || !element.bounds.height) &&
+      candidateVector.bounds &&
+      candidateVector.bounds.width &&
+      candidateVector.bounds.height
+    ) {
+      element = candidateVector;
+    }
     if (!element) return;
     if (!element.uid && elementInput?.uid) element.uid = elementInput.uid;
     if (element.uid) this.elements[element.uid] = element;
@@ -2940,6 +2952,13 @@ export default class LaserCanvas {
     const images = {};
     const vectors = {};
 
+    const isDrawable = (item: any) => {
+      if (!item) return false;
+      if (item.kind === E_KIND_IMAGE) return true;
+      const bounds = item.bounds;
+      return !!(bounds && bounds.width && bounds.height);
+    };
+
     const collect = (item: any) => {
       if (!item) return;
       if (item.uid === SELECT) {
@@ -2951,9 +2970,15 @@ export default class LaserCanvas {
         return;
       }
       if (item.uid) {
-        elements[item.uid] = item;
-        if (item.kind === E_KIND_IMAGE) images[item.uid] = item;
-        if (item.kind === E_KIND_VECTOR || item.type === E_KIND_VECTOR) vectors[item.uid] = item;
+        const existing = elements[item.uid];
+        if (!existing) {
+          elements[item.uid] = item;
+        } else if (!isDrawable(existing) && isDrawable(item)) {
+          elements[item.uid] = item;
+        }
+        const selected = elements[item.uid];
+        if (selected.kind === E_KIND_IMAGE) images[item.uid] = selected;
+        if (selected.kind === E_KIND_VECTOR || selected.type === E_KIND_VECTOR) vectors[item.uid] = selected;
       }
 
       if (item.children && item.children.length) {

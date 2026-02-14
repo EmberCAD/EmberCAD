@@ -178,8 +178,23 @@ export default class CanvasVector extends CanvasElement {
     element.type = E_KIND_VECTOR;
 
     this.rasterized = false;
+
+    const prevElement = this.element;
     this.vector = element;
     this.vector.uid = this.uid;
+
+    // Canonicalize imported root: replace temporary placeholder with real imported node.
+    // Keeping both causes duplicate uid/selection-layer conflicts.
+    this.element = this.vector;
+    if (prevElement && prevElement !== this.element) {
+      try {
+        prevElement.removeChildren && prevElement.removeChildren();
+        prevElement.remove && prevElement.remove();
+      } catch (error) {
+        console.warn('Failed to remove vector placeholder root:', error);
+      }
+    }
+
     this.groupChildren(this.vector);
 
     element.strokeColor = window[CURRENT_THEME].object.strokeColor;

@@ -87,6 +87,10 @@ export default class GCode {
     const collect = (child) => {
       if (!child || child.visible === false) return;
       if (isTextCarrier(child)) return;
+      if (child.kind !== E_KIND_IMAGE) {
+        const b = child.bounds;
+        if (!b || !b.width || !b.height) return;
+      }
       const hasChildren = !!(child.children && child.children.length);
       const laserType = child?.laserSettings?.laserType;
       const isFillContainer =
@@ -122,7 +126,9 @@ export default class GCode {
       this.GCodeShapes = [];
       for (let i = 0; i < layerItems.length; i++) {
         const child = layerItems[i];
+        if (!child) continue;
         const b = child.bounds;
+        if (!b || !b.width || !b.height) continue;
         if (b.left < 0 || b.top < 0 || b.right > this.workingArea.width || b.bottom > this.workingArea.height) continue;
         await this.addPoints(child);
       }

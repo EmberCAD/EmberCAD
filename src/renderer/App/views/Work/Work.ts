@@ -1073,6 +1073,7 @@ export default class Work extends View {
       const item = elements[uids[i]];
       if (!item || !item.uid || item.uid === SELECT) continue;
       if (isTextProxy(item) || isTextCarrier(item)) continue;
+      if (!this.isLayerTargetItem(item)) continue;
       if (getLayerId(item) === layerId) fallback.push(item);
     }
     return fallback;
@@ -1311,6 +1312,13 @@ export default class Work extends View {
 
     const allItems = [];
     const seen = {};
+    const isBetterCandidate = (prev: any, next: any) => {
+      if (!prev) return true;
+      if (!next) return false;
+      const prevDrawable = this.isLayerTargetItem(prev);
+      const nextDrawable = this.isLayerTargetItem(next);
+      return !prevDrawable && nextDrawable;
+    };
     const collectItems = (item) => {
       if (!item) return;
       if (item.uid === SELECT) {
@@ -1318,11 +1326,17 @@ export default class Work extends View {
         for (let i = 0; i < selectedChildren.length; i++) collectItems(selectedChildren[i]);
         return;
       }
-      if (item.uid && seen[item.uid]) return;
       if (item.uid) {
-        seen[item.uid] = true;
-        nextElements[item.uid] = item;
-        allItems.push(item);
+        if (!seen[item.uid]) {
+          seen[item.uid] = true;
+          nextElements[item.uid] = item;
+          allItems.push(item);
+        } else if (isBetterCandidate(nextElements[item.uid], item)) {
+          const prev = nextElements[item.uid];
+          nextElements[item.uid] = item;
+          const index = allItems.indexOf(prev);
+          if (index >= 0) allItems[index] = item;
+        }
       }
       const children = item.children || [];
       for (let i = 0; i < children.length; i++) collectItems(children[i]);
@@ -1338,6 +1352,7 @@ export default class Work extends View {
     const layerAllBuckets = {};
     for (let i = 0; i < allItems.length; i++) {
       const child = allItems[i];
+      if (!this.isLayerTargetItem(child) && !isTextCarrier(child) && !isTextRoot(child)) continue;
       this.ensureItemLayer(child);
       child.opacity = this.getElementOpacity(child);
       const layerId = getLayerId(child);
@@ -1409,6 +1424,14 @@ export default class Work extends View {
       if (!allowComposite) return false;
     }
     return true;
+  }
+
+  private isLayerTargetItem(child: any) {
+    if (!child || !child.uid || child.uid === SELECT) return false;
+    if (isTextCarrier(child)) return false;
+    if (child.kind === E_KIND_IMAGE) return true;
+    const bounds = child.bounds;
+    return !!(bounds && bounds.width && bounds.height);
   }
 
   private ensureItemLayer(child) {

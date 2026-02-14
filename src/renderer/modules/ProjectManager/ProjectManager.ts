@@ -209,12 +209,60 @@ export default class ProjectManager {
       imported.remove();
     }
 
+    this.cleanupDuplicateUidGhosts(layer);
+
     this.laserCanvas.toolbox.select.unselectAll();
     if (typeof this.laserCanvas.refreshScene === 'function') {
       this.laserCanvas.refreshScene(true);
     }
     this.laserCanvas.updateSelection();
     this.laserCanvas.paper.view.update();
+  }
+
+  private cleanupDuplicateUidGhosts(root: any) {
+    if (!root) return;
+    const byUid: Record<string, any[]> = {};
+
+    const isDrawable = (item: any) => {
+      if (!item) return false;
+      if (item.kind === E_KIND_IMAGE) return true;
+      const b = item.bounds;
+      return !!(b && b.width && b.height);
+    };
+
+    const walk = (item: any) => {
+      if (!item) return;
+      if (item.uid && item.uid !== SELECT) {
+        if (!byUid[item.uid]) byUid[item.uid] = [];
+        byUid[item.uid].push(item);
+      }
+      const children = this.getChildren(item);
+      for (let i = 0; i < children.length; i++) walk(children[i]);
+    };
+
+    const rootChildren = this.getChildren(root);
+    for (let i = 0; i < rootChildren.length; i++) walk(rootChildren[i]);
+
+    const uids = Object.keys(byUid);
+    for (let i = 0; i < uids.length; i++) {
+      const uid = uids[i];
+      const items = byUid[uid];
+      if (!items || items.length < 2) continue;
+      let keep = items[0];
+      for (let j = 1; j < items.length; j++) {
+        const candidate = items[j];
+        if (!isDrawable(keep) && isDrawable(candidate)) keep = candidate;
+      }
+      for (let j = 0; j < items.length; j++) {
+        const item = items[j];
+        if (item === keep) continue;
+        try {
+          item.remove && item.remove();
+        } catch (error) {
+          console.warn('Failed to remove duplicate uid ghost item:', uid, error);
+        }
+      }
+    }
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////
