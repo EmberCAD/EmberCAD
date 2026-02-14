@@ -29,7 +29,7 @@ export default class PowerIntervalTools {
 
   private initView() {
     this.lPower = this.topTool.addLabel('Power:');
-    this.constantPower = this.topTool.addCheckBox('Constant', false);
+    this.constantPower = this.topTool.addCheckBox('Constant', true);
 
     this.minPower = this.topTool.addLabelInput('Min:', 15, '%');
     this.maxPower = this.topTool.addLabelInput('Max:', 100, '%');
@@ -209,7 +209,7 @@ export default class PowerIntervalTools {
     const DPIin = Math.round(this.element.width / (this.element.bounds.width / 25.4)) || '---';
     const DPIout = Math.round(1 / mmToInch(laserSettings.fill.lineInterval));
 
-    this.constantPower.checked = laserSettings.constantPower;
+    this.constantPower.checked = laserSettings.constantPower === undefined ? true : !!laserSettings.constantPower;
 
     this.minPower.input.text = laserSettings.minPower;
     this.maxPower.input.text = laserSettings.power;

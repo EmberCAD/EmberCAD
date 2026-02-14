@@ -1,8 +1,37 @@
 import path from 'path';
 import fs from 'fs';
 import { dialog, app } from '@electron/remote';
+import { DeepCopy } from '../../lib/api/cherry/api';
+import { E_KIND_IMAGE, E_KIND_VECTOR } from '../../components/LaserCanvas/CanvasElement';
+import { ELEMENTS, IMAGES, OBJECTS_LAYER, VECTORS } from '../../components/LaserCanvas/LaserCanvas';
+import { SELECT } from '../../components/LaserCanvas/Tools/Select';
+import { getLayerColor, getLayerId, setLayerData } from '../layers';
 
 const RECENT_PROJECTS_KEY = 'embercad_recent_projects';
+const PROJECT_FORMAT = 'ecad-v2';
+
+type ElementMeta = {
+  uid: string;
+  uname?: string;
+  kind?: string;
+  userGroup?: boolean;
+  inGroup?: boolean;
+  laserSettings?: any;
+  visible?: boolean;
+  locked?: boolean;
+  type?: any;
+  parentUid?: string | null;
+  data?: any;
+  layerId?: string;
+  layerColor?: string;
+};
+
+type SerializedProject = {
+  format: string;
+  childrenJSON: string[];
+  metadata: Record<string, ElementMeta>;
+  layerData: Record<string, any>;
+};
 
 export default class ProjectManager {
   private _laserCanvas: any;
@@ -134,8 +163,20 @@ export default class ProjectManager {
     if (!this.laserCanvas) return '';
 
     try {
-      const exported = this.laserCanvas.objectsLayer.exportJSON();
-      return typeof exported === 'string' ? exported : JSON.stringify(exported);
+      const layer = this.laserCanvas.objectsLayer;
+      const restoreSelectionGroup = this.detachSelectionGroup();
+      try {
+        const children = this.getChildren(layer);
+        const payload: SerializedProject = {
+          format: PROJECT_FORMAT,
+          childrenJSON: children.map((item: any) => item.exportJSON()),
+          metadata: this.captureMetadata(layer),
+          layerData: layer?.data ? DeepCopy(layer.data) : {},
+        };
+        return JSON.stringify(payload);
+      } finally {
+        if (restoreSelectionGroup) restoreSelectionGroup();
+      }
     } catch (error) {
       throw new Error(`Failed to serialize project: ${error?.message || error}`);
     }
@@ -146,16 +187,32 @@ export default class ProjectManager {
   private async loadProjectFromPath(filePath: string) {
     if (!this.laserCanvas) throw new Error('Laser canvas is not ready');
     const data = await fs.promises.readFile(filePath, 'utf-8');
+    const layer = this.laserCanvas.objectsLayer;
+    const parsed = this.tryParseProject(data);
 
-    const imported = this.laserCanvas.paper.project.importJSON(data);
-    this.laserCanvas.objectsLayer.removeChildren();
-
-    if (imported && imported.children && imported.children.length) {
-      this.laserCanvas.objectsLayer.addChildren(imported.children);
+    if (parsed && parsed.format === PROJECT_FORMAT && Array.isArray(parsed.childrenJSON)) {
+      layer.removeChildren();
+      for (let i = 0; i < parsed.childrenJSON.length; i++) {
+        layer.importJSON(parsed.childrenJSON[i]);
+      }
+      layer.data = parsed.layerData ? DeepCopy(parsed.layerData) : {};
+      this.applyMetadata(layer, parsed.metadata || {});
+    } else {
+      const imported = this.laserCanvas.paper.project.importJSON(data);
+      layer.removeChildren();
+      if (!layer.data) layer.data = {};
+      const importedData = imported && imported.data ? imported.data : {};
+      layer.data = { ...importedData };
+      if (imported && imported.children && imported.children.length) {
+        layer.addChildren(imported.children);
+      }
+      imported.remove();
     }
 
-    imported.remove();
     this.laserCanvas.toolbox.select.unselectAll();
+    if (typeof this.laserCanvas.refreshScene === 'function') {
+      this.laserCanvas.refreshScene(true);
+    }
     this.laserCanvas.updateSelection();
     this.laserCanvas.paper.view.update();
   }
@@ -330,5 +387,165 @@ export default class ProjectManager {
     if (typeof this.onRecentChange === 'function') {
       this.onRecentChange(this.getRecentFiles());
     }
+  }
+
+  private tryParseProject(data: string): SerializedProject | null {
+    try {
+      const parsed = JSON.parse(data);
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (!parsed.format || !Array.isArray(parsed.childrenJSON)) return null;
+      return parsed as SerializedProject;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  private getChildren(item: any) {
+    if (!item || !item.children) return [];
+    if (Array.isArray(item.children)) return item.children.slice();
+    try {
+      return Array.from(item.children);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  private resolveParentUid(item: any, parent: any) {
+    const currentParent = item && item.currentParent;
+    if (typeof currentParent === 'string') {
+      return currentParent === SELECT ? null : currentParent;
+    }
+    if (!parent || !parent.uid) return null;
+    return parent.uid === SELECT ? null : parent.uid;
+  }
+
+  private captureMetadata(root: any) {
+    const metadata: Record<string, ElementMeta> = {};
+
+    const walk = (item: any, itemPath: string, parent: any) => {
+      if (!item) return;
+      if (item.uid) {
+        metadata[itemPath] = {
+          uid: item.uid,
+          uname: item.uname,
+          kind: item.kind,
+          userGroup: item.userGroup,
+          inGroup: item.inGroup,
+          laserSettings: item.laserSettings ? DeepCopy(item.laserSettings) : undefined,
+          visible: typeof item.visible === 'boolean' ? item.visible : undefined,
+          locked: typeof item.locked === 'boolean' ? item.locked : undefined,
+          type: item.type,
+          parentUid: this.resolveParentUid(item, parent),
+          data: item.data ? DeepCopy(item.data) : undefined,
+          layerId: getLayerId(item),
+          layerColor: getLayerColor(item),
+        };
+      }
+
+      const children = this.getChildren(item);
+      for (let i = 0; i < children.length; i++) {
+        const childPath = itemPath ? `${itemPath}.${i}` : `${i}`;
+        walk(children[i], childPath, item);
+      }
+    };
+
+    const rootChildren = this.getChildren(root);
+    for (let i = 0; i < rootChildren.length; i++) {
+      walk(rootChildren[i], `${i}`, root);
+    }
+
+    return metadata;
+  }
+
+  private applyMetadata(root: any, metadata: Record<string, ElementMeta>) {
+    const elements: Record<string, any> = {};
+    const images: Record<string, any> = {};
+    const vectors: Record<string, any> = {};
+
+    const walk = (item: any, itemPath: string, parent: any) => {
+      if (!item) return;
+      const info = metadata[itemPath];
+      const resolvedParentUid =
+        info && Object.prototype.hasOwnProperty.call(info, 'parentUid')
+          ? info.parentUid
+          : this.resolveParentUid(item, parent);
+
+      if (info) {
+        item.uid = info.uid;
+        if (typeof info.uname !== 'undefined') item.uname = info.uname;
+        if (typeof info.kind !== 'undefined') item.kind = info.kind;
+        if (typeof info.userGroup !== 'undefined') item.userGroup = info.userGroup;
+        if (typeof info.inGroup !== 'undefined') item.inGroup = info.inGroup;
+        if (typeof info.visible !== 'undefined') item.visible = info.visible;
+        if (typeof info.locked !== 'undefined') item.locked = info.locked;
+        if (typeof info.type !== 'undefined') item.type = info.type;
+        if (typeof info.data !== 'undefined') item.data = DeepCopy(info.data);
+        item.laserSettings = info.laserSettings ? DeepCopy(info.laserSettings) : item.laserSettings;
+        item.sel = false;
+        item.currentParent = typeof resolvedParentUid === 'string' ? resolvedParentUid : null;
+        if (info.layerId) setLayerData(item, info.layerId, info.layerColor);
+      }
+
+      if (item.uid) {
+        elements[item.uid] = item;
+        if (item.kind === E_KIND_IMAGE) images[item.uid] = item;
+        if (item.kind === E_KIND_VECTOR || item.type === E_KIND_VECTOR) vectors[item.uid] = item;
+      }
+
+      const children = this.getChildren(item);
+      for (let i = 0; i < children.length; i++) {
+        const childPath = itemPath ? `${itemPath}.${i}` : `${i}`;
+        walk(children[i], childPath, item);
+      }
+    };
+
+    const rootChildren = this.getChildren(root);
+    for (let i = 0; i < rootChildren.length; i++) {
+      walk(rootChildren[i], `${i}`, root);
+    }
+
+    this.laserCanvas.elements = elements;
+    window[ELEMENTS] = elements;
+    window[IMAGES] = images;
+    window[VECTORS] = vectors;
+  }
+
+  private detachSelectionGroup() {
+    const select = this.laserCanvas?.toolbox?.select;
+    const selectionGroup = select?.selectionGroup;
+    if (!selectionGroup || !selectionGroup.parent) return null;
+
+    const parent = selectionGroup.parent;
+    const index =
+      typeof selectionGroup.index === 'number'
+        ? selectionGroup.index
+        : parent.children.indexOf(selectionGroup);
+
+    const selectionChildren = selectionGroup.children ? selectionGroup.children.slice() : [];
+    const placements: Array<{ child: any; parent: any }> = [];
+
+    for (let i = 0; i < selectionChildren.length; i++) {
+      const child = selectionChildren[i];
+      if (!child) continue;
+      const parentUid = typeof child.currentParent === 'string' ? child.currentParent : null;
+      let targetParent = parentUid && this.laserCanvas?.elements ? this.laserCanvas.elements[parentUid] : null;
+      if (!targetParent || targetParent.uid === SELECT) targetParent = window[OBJECTS_LAYER];
+      child.remove();
+      targetParent.addChild(child);
+      placements.push({ child, parent: targetParent });
+    }
+
+    selectionGroup.remove();
+
+    return () => {
+      for (let i = placements.length - 1; i >= 0; i--) {
+        const child = placements[i].child;
+        if (!child) continue;
+        if (child.parent) child.remove();
+        selectionGroup.addChild(child);
+      }
+      if (!parent.children || !parent.insertChild) return;
+      parent.insertChild(index, selectionGroup);
+    };
   }
 }

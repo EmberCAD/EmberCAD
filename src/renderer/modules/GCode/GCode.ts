@@ -11,6 +11,15 @@ import {
 } from '../../components/LaserCanvas/LaserCanvas';
 import { DeepCopy } from '../../lib/api/cherry/api';
 import { FillToGcode, ImagePreview, ImageToGCode } from './ImageG';
+import {
+  DEFAULT_LAYER_ID,
+  getDefaultLayerOrder,
+  getLayerId,
+  isTextCarrier,
+  isTextRoot,
+  isToolLayer,
+  LAYER_ORDER_KEY,
+} from '../layers';
 
 const ROUND = 1000;
 export const DEFAULT_DIAMETER = 0.1;
@@ -73,15 +82,51 @@ export default class GCode {
     this.cleanupTable = [];
     this.GCodeElements = [];
 
-    for (let i = 0; i < item.children.length; i++) {
-      let child = item.children[i];
-      if (!child || !child.visible || !child.laserSettings || !child.laserSettings.output) continue;
-      const b = child.bounds;
-      if (b.left < 0 || b.top < 0 || b.right > this.workingArea.width || b.bottom > this.workingArea.height) continue;
+    const buckets = {};
+    const layerTools = (item && item.data && item.data.layerTools) || {};
+    const collect = (child) => {
+      if (!child || child.visible === false) return;
+      if (isTextCarrier(child)) return;
+      if (child.children && child.children.length) {
+        for (let i = 0; i < child.children.length; i++) collect(child.children[i]);
+      }
+      if (isTextRoot(child)) return;
+      const layerId = getLayerId(child) || DEFAULT_LAYER_ID;
+      const layerTool = layerTools[layerId];
+      const outputEnabled = isToolLayer(layerId) ? false : layerTool ? !!layerTool.output : !!child?.laserSettings?.output;
+      const layerVisible = layerTool ? layerTool.visible !== false : child.visible !== false;
+      if (!child.laserSettings || !outputEnabled || !layerVisible) return;
+      if (isToolLayer(layerId)) return;
+      if (child.children && child.children.length && child.kind !== E_KIND_TEXT && child.kind !== E_KIND_IMAGE) return;
+      if (!buckets[layerId]) buckets[layerId] = [];
+      buckets[layerId].push(child);
+    };
+    for (let i = 0; i < item.children.length; i++) collect(item.children[i]);
+
+    const configuredOrder = Array.isArray(window[LAYER_ORDER_KEY]) ? window[LAYER_ORDER_KEY] : getDefaultLayerOrder();
+    const orderedLayers = configuredOrder
+      .filter((layerId) => buckets[layerId] && buckets[layerId].length)
+      .concat(Object.keys(buckets).filter((layerId) => !configuredOrder.includes(layerId)));
+
+    for (let l = 0; l < orderedLayers.length; l++) {
+      const layerId = orderedLayers[l];
+      const layerItems = buckets[layerId];
       this.GCodeShapes = [];
-      await this.addShape(child);
-      if (this.GCodeShapes.length) {
-        this.GCodeElements.push(this.GCodeShapes);
+      for (let i = 0; i < layerItems.length; i++) {
+        const child = layerItems[i];
+        const b = child.bounds;
+        if (b.left < 0 || b.top < 0 || b.right > this.workingArea.width || b.bottom > this.workingArea.height) continue;
+        await this.addPoints(child);
+      }
+
+      if (!this.GCodeShapes.length) continue;
+
+      this.sortShapes();
+      this.findPathForSorted();
+      this.GCodeElements.push(this.GCodeShapes.slice());
+      const lastShape = this.GCodeShapes[this.GCodeShapes.length - 1];
+      if (lastShape && lastShape.points && lastShape.points.length) {
+        this.lastPoint = lastShape.points[lastShape.points.length - 1].position;
       }
     }
   }
@@ -96,20 +141,6 @@ export default class GCode {
     if (!this.GCodeShapes.length) return;
 
     this.sortShapes();
-
-    this.GCodeShapes.sort((a, b) => {
-      const isInside = (sh1, sh2) => {
-        //is sh1 in sh2
-        const b1 = sh1.bounds;
-        const b2 = sh2.bounds;
-
-        return b1.x > b2.x && b1.y > b2.y && b1.x + b1.w < b2.x + b2.w && b1.y + b1.h < b2.y + b2.h;
-      };
-
-      if (isInside(a, b)) return -1;
-      if (isInside(b, a)) return 1;
-      return 0;
-    });
     this.findPathForSorted();
 
     let lastIndex = this.GCodeShapes.length - 1;
@@ -122,9 +153,125 @@ export default class GCode {
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   sortShapes() {
-    this.sortedShapes = [];
-    this.findNearestShape();
-    this.GCodeShapes = this.sortedShapes;
+    if (!this.GCodeShapes || !this.GCodeShapes.length) {
+      this.sortedShapes = [];
+      return;
+    }
+
+    const shapes = this.GCodeShapes.slice();
+    const len = shapes.length;
+    const indegree = new Array(len).fill(0);
+    const unlocks = new Array(len).fill(0).map(() => []);
+
+    for (let i = 0; i < len; i++) {
+      for (let j = i + 1; j < len; j++) {
+        const aInB = this.isShapeInside(shapes[i], shapes[j]);
+        const bInA = this.isShapeInside(shapes[j], shapes[i]);
+        if (aInB && !bInA) {
+          indegree[j]++;
+          unlocks[i].push(j);
+        } else if (bInA && !aInB) {
+          indegree[i]++;
+          unlocks[j].push(i);
+        }
+      }
+    }
+
+    const available: number[] = [];
+    for (let i = 0; i < len; i++) {
+      if (indegree[i] === 0) available.push(i);
+    }
+
+    const used = new Array(len).fill(false);
+    const ordered = [];
+    let lastPoint = this.lastPoint || this.startPoint || { x: 0, y: 0 };
+
+    while (ordered.length < len) {
+      let pool = available.filter((idx) => !used[idx]);
+      if (!pool.length) {
+        pool = [];
+        for (let i = 0; i < len; i++) {
+          if (!used[i]) pool.push(i);
+        }
+      }
+      if (!pool.length) break;
+
+      let bestIdx = pool[0];
+      let bestDist = Number.MAX_SAFE_INTEGER;
+      let bestEnd = lastPoint;
+      for (let i = 0; i < pool.length; i++) {
+        const idx = pool[i];
+        const meta = this.getShapeDistanceMeta(shapes[idx], lastPoint);
+        if (meta.dist < bestDist) {
+          bestDist = meta.dist;
+          bestIdx = idx;
+          bestEnd = meta.endPoint || lastPoint;
+        }
+      }
+
+      used[bestIdx] = true;
+      ordered.push(shapes[bestIdx]);
+      lastPoint = bestEnd;
+
+      for (let i = 0; i < unlocks[bestIdx].length; i++) {
+        const to = unlocks[bestIdx][i];
+        indegree[to] = Math.max(0, indegree[to] - 1);
+        if (indegree[to] === 0 && !used[to] && !available.includes(to)) {
+          available.push(to);
+        }
+      }
+    }
+
+    this.sortedShapes = ordered;
+    this.GCodeShapes = ordered.slice();
+  }
+
+  private isShapeInside(inner: any, outer: any) {
+    if (!inner?.bounds || !outer?.bounds) return false;
+    const EPS = 1e-6;
+    const b1 = inner.bounds;
+    const b2 = outer.bounds;
+    return (
+      b1.x > b2.x + EPS &&
+      b1.y > b2.y + EPS &&
+      b1.x + b1.w < b2.x + b2.w - EPS &&
+      b1.y + b1.h < b2.y + b2.h - EPS
+    );
+  }
+
+  private getShapeDistanceMeta(shape: any, lastPoint: any) {
+    const fallback = {
+      dist: Number.MAX_SAFE_INTEGER,
+      endPoint: lastPoint || { x: 0, y: 0 },
+    };
+
+    if (!shape || !shape.points || !shape.points.length || !lastPoint) return fallback;
+
+    if (shape.kind !== E_KIND_IMAGE && !shape.fill) {
+      const points = shape.points.slice(1);
+      if (!points.length) return fallback;
+
+      if (shape.closed) {
+        const found = this.findNearestPoint(points, lastPoint);
+        const nearest = points[found.nearestIndex]?.position || lastPoint;
+        return { dist: found.dist, endPoint: nearest };
+      }
+
+      const endPoints = [points[0], points[points.length - 1]];
+      const found = this.findNearestPoint(endPoints, lastPoint);
+      const startIndex = found.nearestIndex || 0;
+      const endIndex = startIndex === 0 ? 1 : 0;
+      const endPoint = endPoints[endIndex]?.position || endPoints[startIndex]?.position || lastPoint;
+      return { dist: found.dist, endPoint };
+    }
+
+    const first = shape.points[0]?.position;
+    const last = shape.points[shape.points.length - 1]?.position;
+    if (!first || !last) return fallback;
+    return {
+      dist: Math.abs(this.distance(lastPoint.x, lastPoint.y, first.x, first.y)),
+      endPoint: last,
+    };
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -349,6 +496,7 @@ export default class GCode {
       if (!isFill && item.children && item.children.length) {
         for (let i = 0; i < item.children.length; i++) {
           const child = item.children[i];
+          if (child.visible === false) continue;
           if (child.laserSettings && !child.laserSettings.output) continue;
           await this.addPoints(child);
         }

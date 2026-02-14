@@ -27,6 +27,7 @@ export default class TextTools {
   sizeI: any;
   spaceX: any;
   spaceY: any;
+  convertToPathB: any;
   alignS: any;
 
   private _fonts: any;
@@ -84,6 +85,9 @@ export default class TextTools {
     this.spaceY = this.topTool.addLabelInput('Spacing Y:', 0, unitHint);
     this.spaceY.input.width = '3rem';
     this.spaceY.isNumeric = true;
+    this.spaceY.marginRight = '0.5rem';
+
+    this.convertToPathB = this.topTool.addButton('Convert to Path', 'Convert editable text to vector path');
 
     this.separator = this.topTool.addSeparator();
 
@@ -151,6 +155,10 @@ export default class TextTools {
       this.spaceY.input.text = space;
       this.updateElement();
       if (typeof this.onSpaceYChange === 'function') this.onSpaceYChange(space);
+    };
+
+    this.convertToPathB.onClick = () => {
+      if (typeof this.onConvertToPath === 'function') this.onConvertToPath();
     };
   }
 

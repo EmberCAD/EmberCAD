@@ -6,6 +6,7 @@ import { DefaultLaserSettings, ElementLaserType } from '../../../App/views/Work/
 import { DeepCopy } from '../../../lib/api/cherry/api';
 import { codec64 } from '../../../lib/api/cherry/codec64';
 import { applyStrokeFill, getElementColor, checkImageInArea, readUni, writeUni } from '../../../modules/helpers';
+import { isTextCarrier, isTextProxy, isTextRoot } from '../../../modules/layers';
 import { Counters, E_KIND_GROUP, E_KIND_IMAGE, E_KIND_RASTER, E_KIND_TEXT } from '../CanvasElement';
 import {
   CENTER_GRID,
@@ -216,15 +217,25 @@ export default class Select {
 
     if (hit) {
       hitItem = hit.item;
+      const resolveTextRoot = (item: any) => {
+        let current = item;
+        while (current) {
+          if (isTextRoot(current)) return current;
+          current = current.parent;
+        }
+        return null;
+      };
+      const textRoot = resolveTextRoot(hitItem);
       if (e.event.altKey && hitItem.inGroup) {
         this.unselectAll();
         // hitItem.sel = false;
-        this.select(hitItem);
+        this.select(textRoot || hitItem);
         this.onAltSelect();
         return;
       }
       if (!hitItem.opacity) return;
-      if (hitItem.inGroup) hitItem = this.getParent(hitItem);
+      if (textRoot) hitItem = textRoot;
+      else if (hitItem.inGroup) hitItem = this.getParent(hitItem);
     }
 
     if (e.scaleCenter) {
@@ -356,10 +367,47 @@ export default class Select {
 
       let inside = window[OBJECTS_LAYER].getItems(option);
       let insideSel = this.selectionGroup.getItems(option);
+      const seen = {};
+      const resolveRectSelectionItem = (raw: any) => {
+        let item = raw;
+        if (!item) return null;
+        if (item.uid === SELECT) return null;
+        // Walk ancestors so path/curve descendants of text proxy are normalized to text root.
+        let current = item;
+        let textCandidate = null;
+        while (current) {
+          if (isTextCarrier(current)) return null;
+          if (isTextRoot(current)) {
+            textCandidate = current;
+            break;
+          }
+          if (isTextProxy(current)) {
+            const rootUid = current?.data?.textRootUid;
+            if (rootUid && window[ELEMENTS] && window[ELEMENTS][rootUid] && isTextRoot(window[ELEMENTS][rootUid])) {
+              textCandidate = window[ELEMENTS][rootUid];
+            } else {
+              textCandidate = current;
+            }
+            break;
+          }
+          current = current.parent;
+        }
+        item = textCandidate || item;
+        // Align box-selection with click-selection: if resolved item is inside a group,
+        // select the top-level parent group instead of internal children.
+        if (item.inGroup) item = this.getParent(item);
+        if (!item || item.uid === SELECT) return null;
+        if (item.visible === false || item.opacity === 0) return null;
+        const key = item.uid || item._id || null;
+        if (key && seen[key]) return null;
+        if (key) seen[key] = true;
+        return item;
+      };
       if (inside.length) {
         with_event = SELECT_EVENT;
         for (let i = 0; i < inside.length; i++) {
-          const item = inside[i];
+          const item = resolveRectSelectionItem(inside[i]);
+          if (!item) continue;
 
           if (
             !item.userGroup &&
@@ -380,7 +428,8 @@ export default class Select {
         with_event = SELECT_EVENT;
 
         for (let i = 0; i < insideSel.length; i++) {
-          const item = insideSel[i];
+          const item = resolveRectSelectionItem(insideSel[i]);
+          if (!item) continue;
 
           if (!item.type || item.name === CENTER_GRID || item.name === OBJECTS_LAYER || item.inGroup) continue;
 
@@ -507,8 +556,15 @@ export default class Select {
   filterSubGroups(items) {
     let result = [];
     for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.userGroup) {
+      let item = items[i];
+      if (!item) continue;
+      if ((isTextProxy(item) || isTextCarrier(item)) && item?.data?.textRootUid && window[ELEMENTS]) {
+        const root = window[ELEMENTS][item.data.textRootUid];
+        if (root && isTextRoot(root)) item = root;
+      }
+      // Keep text as atomic element when grouping with other objects.
+      // Otherwise text gets flattened to glyph curves and can no longer be edited.
+      if (item.userGroup && item.kind !== E_KIND_TEXT) {
         const sub = this.filterSubGroups(item.children);
         if (sub.length) result = result.concat(sub);
         continue;
@@ -583,7 +639,7 @@ export default class Select {
     window[OBJECTS_LAYER].addChild(this.selectionGroup);
 
     const item = this.selectedItems[0];
-    const items = item.children;
+    const items = (item.children || []).slice();
     const parentGroup = item.currentParent;
 
     if (!item.userGroup || !items || !items.length) return;
@@ -602,13 +658,12 @@ export default class Select {
       child.type = 'ungroup';
       child.currentParent = parentGroup;
       child.data.prevRotation = item.data.rotation;
-      this.selectionGroup.addChildren(child);
+      this.selectionGroup.addChild(child);
       ungroup.push(child);
     }
     ungroup.sel = true;
     ungroup.currentParent = parentGroup;
 
-    this.selectionGroup.addChildren(ungroup);
     this.selectedItems = ungroup;
     const rem = item.remove();
     if (typeof this.onUngroup === 'function') this.onUngroup(ungroup);
@@ -643,6 +698,10 @@ export default class Select {
       this.unselect(item);
     }
     this.selectedItems = [];
+    this.selectionGroup.visible = false;
+    this.setupSelection();
+    if (typeof this.onUpdateSelection === 'function') this.onUpdateSelection([]);
+    if (typeof this.onUnselectAll === 'function') this.onUnselectAll();
   }
 
   private unselectChildren(item: any) {

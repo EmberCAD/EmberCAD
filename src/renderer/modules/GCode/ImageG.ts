@@ -112,9 +112,20 @@ export const FillToGcode = (element) => {
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 export const ImagePreview = (element: any, refresh = false) => {
+  if (!element || !element.canvas || !element.context) return;
+  if (!element.width || !element.height) return;
+  if (!element.canvas.width || !element.canvas.height) return;
   const dither = element.laserSettings.image.dither;
 
   if ((dither === 'Original' && element.originalContext) || refresh) {
+    if (
+      !element.originalContext ||
+      !element.originalContext.canvas ||
+      !element.originalContext.canvas.width ||
+      !element.originalContext.canvas.height
+    ) {
+      return;
+    }
     element.context.imageSmoothingEnabled = true;
     element.context.drawImage(
       element.originalContext.canvas,
@@ -136,6 +147,10 @@ export const ImagePreview = (element: any, refresh = false) => {
 };
 
 export function reduceRGB(element: any, opts?: any) {
+  if (!element || !element.canvas || !element.context) return null;
+  if (!element.width || !element.height) return null;
+  if (!element.canvas.width || !element.canvas.height) return null;
+  opts = opts || {};
   if (!opts.preview) opts.dithKern = element.laserSettings.image.dither;
   if (opts.dithKern === 'Dither') opts.dithKern = 'FloydSteinberg';
   if (opts.dithKern === 'Dither2') opts.dithKern = 'FalseFloydSteinberg';
@@ -146,7 +161,9 @@ export function reduceRGB(element: any, opts?: any) {
     const canvas = document.createElement('canvas');
     canvas.width = element.width;
     canvas.height = element.height;
+    if (!canvas.width || !canvas.height) return null;
     const ctxOriginal = canvas.getContext('2d');
+    if (!ctxOriginal) return null;
     ctxOriginal.imageSmoothingEnabled = true;
 
     ctxOriginal.drawImage(element.canvas, 0, 0, canvas.width, canvas.height, 0, 0, element.width, element.height);
@@ -179,8 +196,10 @@ export function reduceRGB(element: any, opts?: any) {
   ctx = obj.ctx;
   let ctx2 = ctx;
   if (opts.dithKern === 'Original' || opts.dithKern === 'Grayscale') {
+    if (!ctx2 || !ctx2.canvas || !ctx2.canvas.width || !ctx2.canvas.height) return null;
     rgbToGrayscale(ctx2, negative);
   } else {
+    if (!ctx2 || !ctx2.canvas || !ctx2.canvas.width || !ctx2.canvas.height) return null;
     rgbToGrayscale(ctx2, negative);
     console.log(canvas.width, canvas.height);
 
@@ -193,6 +212,7 @@ export function reduceRGB(element: any, opts?: any) {
     canvas2.width = canvas.width;
     canvas2.height = canvas.height;
     ctx2 = canvas2.getContext('2d');
+    if (!ctx2) return null;
     ctx2.imageSmoothingEnabled = true;
 
     const imgd = ctx2.createImageData(canvas2.width, canvas2.height);

@@ -23,6 +23,8 @@ export interface HistorySnapshot {
   label: string;
   childrenJSON: string[];
   metadata: Record<string, ElementMeta>;
+  layerOrder: string[];
+  layerTools: Record<string, any>;
   selection: string[];
   hash: string;
   timestamp: number;
@@ -128,16 +130,20 @@ export default class History {
     const children = this.getChildren(layer);
     const childrenJSON = children.map((item: any) => item.exportJSON());
     const metadata = this.captureMetadata(layer);
+    const layerOrder = Array.isArray(layer?.data?.layerOrder) ? layer.data.layerOrder.slice() : [];
+    const layerTools = layer?.data?.layerTools ? DeepCopy(layer.data.layerTools) : {};
     const selected = selection != null ? selection : this.getSelection();
 
     if (restoreSelectionGroup) restoreSelectionGroup();
 
-    const hash = this.computeHash(childrenJSON, metadata);
+    const hash = this.computeHash(childrenJSON, metadata, layerOrder, layerTools);
     return {
       id: ++this.sequence,
       label,
       childrenJSON,
       metadata,
+      layerOrder,
+      layerTools,
       selection: selected,
       hash,
       timestamp: Date.now(),
@@ -168,6 +174,9 @@ export default class History {
       for (let i = 0; i < snapshot.childrenJSON.length; i++) {
         layer.importJSON(snapshot.childrenJSON[i]);
       }
+      if (!layer.data) layer.data = {};
+      layer.data.layerOrder = Array.isArray(snapshot.layerOrder) ? snapshot.layerOrder.slice() : [];
+      layer.data.layerTools = snapshot.layerTools ? DeepCopy(snapshot.layerTools) : {};
 
       this.applyMetadata(layer, snapshot.metadata);
       if (typeof this.canvas?.refreshScene === 'function') {
@@ -352,15 +361,22 @@ export default class History {
     }
   }
 
-  private computeHash(childrenJSON: string[], metadata: Record<string, ElementMeta>) {
+  private computeHash(
+    childrenJSON: string[],
+    metadata: Record<string, ElementMeta>,
+    layerOrder: string[],
+    layerTools: Record<string, any>,
+  ) {
     const metaEntries = Object.keys(metadata)
       .sort()
       .map((key) => [key, metadata[key]]);
 
     const metaString = JSON.stringify(metaEntries);
     const childrenString = JSON.stringify(childrenJSON);
+    const layerOrderString = JSON.stringify(layerOrder || []);
+    const layerToolsString = JSON.stringify(layerTools || {});
 
-    return `${History.hash(childrenString)}:${History.hash(metaString)}`;
+    return `${History.hash(childrenString)}:${History.hash(metaString)}:${History.hash(layerOrderString)}:${History.hash(layerToolsString)}`;
   }
 
   private static hash(value: string) {
