@@ -372,15 +372,35 @@ export default class Select {
         let item = raw;
         if (!item) return null;
         if (item.uid === SELECT) return null;
-        if (isTextCarrier(item)) return null;
-        if (isTextProxy(item) && item?.data?.textRootUid && window[ELEMENTS]) {
-          const root = window[ELEMENTS][item.data.textRootUid];
-          if (root && isTextRoot(root)) item = root;
+        // Walk ancestors so path/curve descendants of text proxy are normalized to text root.
+        let current = item;
+        let textCandidate = null;
+        while (current) {
+          if (isTextCarrier(current)) return null;
+          if (isTextRoot(current)) {
+            textCandidate = current;
+            break;
+          }
+          if (isTextProxy(current)) {
+            const rootUid = current?.data?.textRootUid;
+            if (rootUid && window[ELEMENTS] && window[ELEMENTS][rootUid] && isTextRoot(window[ELEMENTS][rootUid])) {
+              textCandidate = window[ELEMENTS][rootUid];
+            } else {
+              textCandidate = current;
+            }
+            break;
+          }
+          current = current.parent;
         }
+        item = textCandidate || item;
+        // Align box-selection with click-selection: if resolved item is inside a group,
+        // select the top-level parent group instead of internal children.
+        if (item.inGroup) item = this.getParent(item);
         if (!item || item.uid === SELECT) return null;
         if (item.visible === false || item.opacity === 0) return null;
-        if (item.uid && seen[item.uid]) return null;
-        if (item.uid) seen[item.uid] = true;
+        const key = item.uid || item._id || null;
+        if (key && seen[key]) return null;
+        if (key) seen[key] = true;
         return item;
       };
       if (inside.length) {
