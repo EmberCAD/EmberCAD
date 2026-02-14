@@ -51,10 +51,11 @@ export default class ElementSettings {
   name: LabelInput;
   splitBottom: Container2;
   speed: LabelInput;
-  power: LabelInput;
   passes: LabelInput;
   constantPower: CheckBox;
+  powerSingle: LabelInput;
   minPower: LabelInput;
+  maxPower: LabelInput;
 
   constructor(private parent) {
     this.init();
@@ -76,6 +77,7 @@ export default class ElementSettings {
     // this.splitRightRight.parts = [100, '%'];
 
     this.parent.padding = '0.5rem';
+    this.parent.paddingTop = '0.75rem';
 
     this.name = new LabelInput(this.split.topPart);
     this.name.label.text = 'Name';
@@ -87,16 +89,19 @@ export default class ElementSettings {
     this.speed.label.text = 'Speed';
     this.speed.marginRight = '.5rem';
 
-    this.power = new LabelInput(this.splitBottom.topPart);
-    this.power.label.text = 'Power';
-    this.power.marginRight = '.5rem';
-
     this.passes = new LabelInput(this.splitBottom.topPart);
     this.passes.label.text = 'Passes';
+    this.passes.marginRight = '.5rem';
 
     this.constantPower = new CheckBox(this.splitBottom.bottomPart);
     this.constantPower.text = 'Constant';
     this.constantPower.marginRight = '.5rem';
+
+    this.powerSingle = new LabelInput(this.splitBottom.bottomPart);
+    this.powerSingle.label.text = 'Power';
+    this.powerSingle.input.width = '3rem';
+    this.powerSingle.marginRight = '.5rem';
+    this.powerSingle.numeric = true;
 
     this.minPower = new LabelInput(this.splitBottom.bottomPart);
     this.minPower.label.text = 'Min';
@@ -104,7 +109,11 @@ export default class ElementSettings {
     this.minPower.marginRight = '.5rem';
     this.minPower.numeric = true;
 
-    this.power.label.text = 'Max';
+    this.maxPower = new LabelInput(this.splitBottom.bottomPart);
+    this.maxPower.label.text = 'Max';
+    this.maxPower.input.width = '3rem';
+    this.maxPower.marginRight = '.5rem';
+    this.maxPower.numeric = true;
 
     this.clear();
   }
@@ -116,11 +125,6 @@ export default class ElementSettings {
 
     this.speed.onChange = (opt) => {
       this.onChangeCB({ ...opt, input: 'speed' });
-      if (opt.changed) this.power.input.input.select();
-    };
-
-    this.power.onChange = (opt) => {
-      this.onChangeCB({ ...opt, input: 'power' });
       if (opt.changed) this.passes.input.input.select();
     };
 
@@ -129,13 +133,21 @@ export default class ElementSettings {
     };
 
     this.constantPower.onChanged = () => {
-      this.togglePowerRangeVisibility();
+      this.togglePowerModeVisibility();
       this.onChangeCB({ changed: true, input: 'constantPower' });
     };
 
     this.minPower.onChange = (opt) => {
       this.onChangeCB({ ...opt, input: 'minPower' });
-      if (opt.changed) this.power.input.input.select();
+      if (opt.changed) this.maxPower.input.input.select();
+    };
+
+    this.maxPower.onChange = (opt) => {
+      this.onChangeCB({ ...opt, input: 'power' });
+    };
+
+    this.powerSingle.onChange = (opt) => {
+      this.onChangeCB({ ...opt, input: 'power' });
     };
   }
 
@@ -148,7 +160,7 @@ export default class ElementSettings {
           speed: Number(this.speed.input.text),
           constantPower: !!this.constantPower.checked,
           minPower: Number(this.minPower.input.text),
-          power: Number(this.power.input.text),
+          power: Number(this.constantPower.checked ? this.powerSingle.input.text : this.maxPower.input.text),
           passes: Number(this.passes.input.text),
           changed: opt.input,
         };
@@ -161,8 +173,12 @@ export default class ElementSettings {
         }
 
         if (power < 0 || power > 100) {
-          power = Number(this.power.initText);
-          this.power.input.text = power;
+          const fallbackPower = Number(
+            this.constantPower.checked ? this.powerSingle.initText : this.maxPower.initText,
+          );
+          power = fallbackPower;
+          if (this.constantPower.checked) this.powerSingle.input.text = power;
+          else this.maxPower.input.text = power;
         }
 
         if (minPower < 0 || minPower > 100) {
@@ -170,7 +186,7 @@ export default class ElementSettings {
           this.minPower.input.text = minPower;
         }
 
-        if (minPower > power) {
+        if (!constantPower && minPower > power) {
           minPower = power;
           this.minPower.input.text = minPower;
         }
@@ -200,16 +216,18 @@ export default class ElementSettings {
 
     this.speed.input.text = '';
     this.minPower.input.text = '';
-    this.power.input.text = '';
+    this.maxPower.input.text = '';
+    this.powerSingle.input.text = '';
     this.passes.input.text = '';
     this.constantPower.checked = true;
 
     this.speed.disabled = true;
     this.minPower.disabled = true;
-    this.power.disabled = true;
+    this.maxPower.disabled = true;
+    this.powerSingle.disabled = true;
     this.passes.disabled = true;
     this.constantPower.disabled = true;
-    this.togglePowerRangeVisibility();
+    this.togglePowerModeVisibility();
   }
 
   ///////////////////////////////////////////////////////////////////////
@@ -219,16 +237,18 @@ export default class ElementSettings {
 
     this.speed.disabled = false;
     this.minPower.disabled = false;
-    this.power.disabled = false;
+    this.maxPower.disabled = false;
+    this.powerSingle.disabled = false;
     this.passes.disabled = false;
     this.constantPower.disabled = false;
 
     this.speed.input.text = obj.speed;
     this.constantPower.checked = obj.constantPower === undefined ? true : !!obj.constantPower;
     this.minPower.input.text = obj.minPower !== undefined ? obj.minPower : '';
-    this.power.input.text = obj.power;
+    this.maxPower.input.text = obj.power;
+    this.powerSingle.input.text = obj.power;
     this.passes.input.text = obj.passes;
-    this.togglePowerRangeVisibility();
+    this.togglePowerModeVisibility();
   }
 
   setLaserControlsVisible(visible: boolean) {
@@ -236,9 +256,10 @@ export default class ElementSettings {
     this.splitBottom.bottomPart.display = visible ? 'flex' : 'none';
   }
 
-  private togglePowerRangeVisibility() {
-    const hideRange = !!this.constantPower.checked;
-    this.minPower.display = hideRange ? 'none' : 'flex';
-    this.power.display = hideRange ? 'none' : 'flex';
+  private togglePowerModeVisibility() {
+    const isConstant = !!this.constantPower.checked;
+    this.powerSingle.display = isConstant ? 'flex' : 'none';
+    this.minPower.display = isConstant ? 'none' : 'flex';
+    this.maxPower.display = isConstant ? 'none' : 'flex';
   }
 }
