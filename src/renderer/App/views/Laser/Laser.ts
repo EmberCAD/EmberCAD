@@ -611,22 +611,30 @@ export default class Laser extends View {
       this.buttonsEnabler(ButtonEnabler.DisableAll);
 
       setTimeout(async () => {
-        this.laserCanvas.isPreviewChanged = false;
-        this.laserCanvas.toolbox.select.unselectAll();
-        this.clearGCode();
+        try {
+          this.laserCanvas.isPreviewChanged = false;
+          this.laserCanvas.toolbox.select.unselectAll();
+          this.clearGCode();
 
-        await this.gcode.addElements(this.laserCanvas.objectsLayer);
-        const gcode = this.gcode.getGCode();
-        this.transport.show();
-        this.transport.position = 1;
-        this.tracePreview.text = SAVE_TO_DISK;
-        this.tracePreview.enabled = true;
-        this.buttonsEnabler(ButtonEnabler.Stop);
+          await this.gcode.addElements(this.laserCanvas.objectsLayer);
+          const gcode = this.gcode.getGCode();
+          this.transport.show();
+          this.transport.position = 1;
+          this.tracePreview.text = SAVE_TO_DISK;
+          this.tracePreview.enabled = true;
+          this.buttonsEnabler(ButtonEnabler.Stop);
 
-        this.drawGCode();
-        this.laserCanvas.imagesVisible(false);
+          this.drawGCode();
+          this.laserCanvas.imagesVisible(false);
 
-        resolve();
+          resolve();
+        } catch (error) {
+          console.error('Prepare preview failed:', error);
+          this.tracePreview.text = PREPARE_JOB;
+          this.tracePreview.enabled = true;
+          this.buttonsEnabler(ButtonEnabler.Ready);
+          reject(error);
+        }
       });
     });
   }

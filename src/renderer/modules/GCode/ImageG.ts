@@ -38,6 +38,7 @@ SierraLite
 
 export const ImageToGCode = (element) => {
   const ctx2 = reduceRGB(element, reduceOptions);
+  if (!ctx2 || !ctx2.canvas || !ctx2.canvas.width || !ctx2.canvas.height) return [];
 
   const top = element.bounds.top;
   const left = element.bounds.left;
@@ -51,6 +52,7 @@ export const ImageToGCode = (element) => {
   const overscanValue = overscan ? element.laserSettings.fill.overscanValue : 0;
 
   const pixels = getGrayscalePixels(ctx2, speed, minPower, maxPower, negative);
+  if (!pixels || !pixels.length) return [];
   const rapidSpeed = 6000;
   const gcode = convertToGCode(pixels, left, top, lineInterval, 25.4, passes, rapidSpeed, overscanValue);
   return gcode;
@@ -86,26 +88,33 @@ export const FillToGcode = (element) => {
     }
   };
 
-  prepareNode(element, true);
-  element.opacity = 1;
-  const raster = element.rasterize({ resolution: 4000, insert: false });
-  raster.laserSettings = DeepCopy(element.laserSettings);
-  raster.laserSettings.image.dither = 'Grayscale';
-  raster.data.rotation = 0;
+  let gcode = [];
+  try {
+    prepareNode(element, true);
+    element.opacity = 1;
+    const raster = element.rasterize({ resolution: 4000, insert: false });
+    if (!raster || !raster.canvas || !raster.width || !raster.height) return [];
+    raster.laserSettings = DeepCopy(element.laserSettings);
+    raster.laserSettings.image.dither = 'Grayscale';
+    raster.data.rotation = 0;
 
-  raster.originalContext = undefined;
-  const gcode = ImageToGCode(raster);
-
-  for (let i = 0; i < styles.length; i++) {
-    const { node, strokeColor, fillColor, strokeWidth, strokeScaling, opacity } = styles[i];
-    if (!node) continue;
-    if (node.strokeColor !== undefined) node.strokeColor = strokeColor;
-    if (node.fillColor !== undefined) node.fillColor = fillColor;
-    if (node.strokeWidth !== undefined && strokeWidth !== undefined) node.strokeWidth = strokeWidth;
-    if (node.strokeScaling !== undefined && strokeScaling !== undefined) node.strokeScaling = strokeScaling;
-    if (node.opacity !== undefined && opacity !== undefined) node.opacity = opacity;
+    raster.originalContext = undefined;
+    gcode = ImageToGCode(raster) || [];
+  } catch (error) {
+    console.error('FillToGcode failed:', error);
+    gcode = [];
+  } finally {
+    for (let i = 0; i < styles.length; i++) {
+      const { node, strokeColor, fillColor, strokeWidth, strokeScaling, opacity } = styles[i];
+      if (!node) continue;
+      if (node.strokeColor !== undefined) node.strokeColor = strokeColor;
+      if (node.fillColor !== undefined) node.fillColor = fillColor;
+      if (node.strokeWidth !== undefined && strokeWidth !== undefined) node.strokeWidth = strokeWidth;
+      if (node.strokeScaling !== undefined && strokeScaling !== undefined) node.strokeScaling = strokeScaling;
+      if (node.opacity !== undefined && opacity !== undefined) node.opacity = opacity;
+    }
+    element.opacity = PREVIEW_OPACITY;
   }
-  element.opacity = PREVIEW_OPACITY;
   return gcode;
 };
 
@@ -244,6 +253,7 @@ export function reduceRGB(element: any, opts?: any) {
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 function getGrayscalePixels(context, speed, minPower, maxPower) {
+  if (!context || !context.canvas || !context.canvas.width || !context.canvas.height) return [];
   const width = context.canvas.width;
   const height = context.canvas.height;
 

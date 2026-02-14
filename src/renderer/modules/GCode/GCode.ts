@@ -516,7 +516,12 @@ export default class GCode {
         const shouldRasterFill = isFill && (isText || !item.userGroup || (item.userGroup && !item.currentParent));
 
         if (shouldRasterFill) {
-          this.GCodeShape = FillToGcode(item);
+          try {
+            this.GCodeShape = FillToGcode(item) || [];
+          } catch (error) {
+            console.error('Fill conversion failed for item:', item?.uid, error);
+            this.GCodeShape = [];
+          }
         } else {
           let length = item.curves.length;
 
@@ -533,8 +538,13 @@ export default class GCode {
           }
         }
       } else {
-        this.GCodeShape = ImageToGCode(item);
-        ImagePreview(item);
+        try {
+          this.GCodeShape = ImageToGCode(item) || [];
+          ImagePreview(item);
+        } catch (error) {
+          console.error('Image conversion failed for item:', item?.uid, error);
+          this.GCodeShape = [];
+        }
       }
 
       if (this.GCodeShape.length) {
