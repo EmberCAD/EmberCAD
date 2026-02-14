@@ -1325,6 +1325,8 @@ export default class LaserCanvas {
     }
 
     if (uids.length) {
+      this.toolbox.select.unselectAll();
+      this.refreshScene(true);
       this.isPreviewChanged = true;
 
       if (typeof this.onElementDropped === 'function') this.onElementDropped({ uids });

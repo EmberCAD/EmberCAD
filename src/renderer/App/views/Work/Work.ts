@@ -961,6 +961,7 @@ export default class Work extends View {
     }
 
     if (!hasChanges) return;
+    if (column === COL_EYE || column === COL_TOOL_EYE) this.pruneSelectionByVisibility();
     this.canvas.isPreviewChanged = true;
     this.updateLists();
     this.handleOnSelect(false);
@@ -1088,6 +1089,31 @@ export default class Work extends View {
     const layer = getLayerById(uid);
     if (layer && layer.id === uid) return [uid];
     return [];
+  }
+
+  private pruneSelectionByVisibility() {
+    const selectTool = this.canvas?.toolbox?.select;
+    if (!selectTool || !selectTool.selectedItems || !selectTool.selectedItems.length) return false;
+
+    const current = selectTool.selectedItems.slice();
+    const keep = [];
+    for (let i = 0; i < current.length; i++) {
+      const raw = current[i];
+      if (!raw) continue;
+      const item = raw.uid ? this.canvas.elements[raw.uid] || raw : raw;
+      if (!item) continue;
+      if (!this.isLayerTargetItem(item)) continue;
+      if (item.visible === false || item.opacity === 0) continue;
+      keep.push(item);
+    }
+
+    if (keep.length === current.length) return false;
+    selectTool.unselectAll();
+    for (let i = 0; i < keep.length; i++) {
+      selectTool.select(keep[i]);
+    }
+    selectTool.updateSelection();
+    return true;
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////

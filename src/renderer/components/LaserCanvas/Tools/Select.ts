@@ -368,6 +368,16 @@ export default class Select {
       let inside = window[OBJECTS_LAYER].getItems(option);
       let insideSel = this.selectionGroup.getItems(option);
       const seen = {};
+      const isSelectableLayerTarget = (candidate: any) => {
+        if (!candidate || candidate.uid === SELECT) return false;
+        if (candidate.name === CENTER_GRID || candidate.name === OBJECTS_LAYER) return false;
+        if (isTextCarrier(candidate)) return false;
+        if (candidate.visible === false || candidate.opacity === 0) return false;
+        if (candidate.kind !== E_KIND_IMAGE) {
+          if (!candidate.bounds || !candidate.bounds.width || !candidate.bounds.height) return false;
+        }
+        return true;
+      };
       const resolveRectSelectionItem = (raw: any) => {
         let item = raw;
         if (!item) return null;
@@ -393,11 +403,8 @@ export default class Select {
           current = current.parent;
         }
         item = textCandidate || item;
-        // Align box-selection with click-selection: if resolved item is inside a group,
-        // select the top-level parent group instead of internal children.
         if (item.inGroup) item = this.getParent(item);
-        if (!item || item.uid === SELECT) return null;
-        if (item.visible === false || item.opacity === 0) return null;
+        if (!isSelectableLayerTarget(item)) return null;
         const key = item.uid || item._id || null;
         if (key && seen[key]) return null;
         if (key) seen[key] = true;
@@ -408,12 +415,6 @@ export default class Select {
         for (let i = 0; i < inside.length; i++) {
           const item = resolveRectSelectionItem(inside[i]);
           if (!item) continue;
-
-          if (
-            !item.userGroup &&
-            (!item.type || item.name === CENTER_GRID || item.name === OBJECTS_LAYER || item.inGroup)
-          )
-            continue;
 
           const sel = e.event.ctrlKey && !e.event.shiftKey ? (item.sel = !item.sel) : true;
           if (sel) {
@@ -430,8 +431,6 @@ export default class Select {
         for (let i = 0; i < insideSel.length; i++) {
           const item = resolveRectSelectionItem(insideSel[i]);
           if (!item) continue;
-
-          if (!item.type || item.name === CENTER_GRID || item.name === OBJECTS_LAYER || item.inGroup) continue;
 
           const sel = e.event.ctrlKey && !e.event.shiftKey ? (item.sel = !item.sel) : true;
           if (sel) {

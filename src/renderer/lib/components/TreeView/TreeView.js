@@ -181,12 +181,14 @@ class TreeView extends Component {
 
     this.onClick = (e) => {
       this.mouseDebouncer = setTimeout(() => {
+        if (!e || !e.state) return;
         this.handleMouseDown(e);
         let uid = e.state.uid;
 
         if (!uid) return;
+        if (!this.items || !this.items[uid]) return;
 
-        if (this.items[uid].type === BIN && e.state.role === 'icon') {
+        if (this.items[uid] && this.items[uid].type === BIN && e.state.role === 'icon') {
           this.toggleBin(uid);
         }
         this.updateTree();
@@ -207,6 +209,7 @@ class TreeView extends Component {
   }
 
   handleMouseDown(e) {
+    if (!e || !e.state) return;
     let column = e.state.col;
 
     if (column) {
@@ -222,6 +225,7 @@ class TreeView extends Component {
       if (this._onSelect) this._onSelect([]);
       return;
     }
+    if (!this.items || !this.items[uid]) return;
 
     if (this.binMode && this.items[uid].type === BIN) {
       if (this.currentBin && this.items[uid].type === BIN) {
