@@ -11,7 +11,15 @@ import {
 } from '../../components/LaserCanvas/LaserCanvas';
 import { DeepCopy } from '../../lib/api/cherry/api';
 import { FillToGcode, ImagePreview, ImageToGCode } from './ImageG';
-import { DEFAULT_LAYER_ID, getDefaultLayerOrder, getLayerId, isToolLayer, LAYER_ORDER_KEY } from '../layers';
+import {
+  DEFAULT_LAYER_ID,
+  getDefaultLayerOrder,
+  getLayerId,
+  isTextCarrier,
+  isTextRoot,
+  isToolLayer,
+  LAYER_ORDER_KEY,
+} from '../layers';
 
 const ROUND = 1000;
 export const DEFAULT_DIAMETER = 0.1;
@@ -78,9 +86,11 @@ export default class GCode {
     const layerTools = (item && item.data && item.data.layerTools) || {};
     const collect = (child) => {
       if (!child || child.visible === false) return;
+      if (isTextCarrier(child)) return;
       if (child.children && child.children.length) {
         for (let i = 0; i < child.children.length; i++) collect(child.children[i]);
       }
+      if (isTextRoot(child)) return;
       const layerId = getLayerId(child) || DEFAULT_LAYER_ID;
       const layerTool = layerTools[layerId];
       const outputEnabled = isToolLayer(layerId) ? false : layerTool ? !!layerTool.output : !!child?.laserSettings?.output;

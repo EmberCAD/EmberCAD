@@ -48,6 +48,9 @@ import {
   getLayerById,
   getLayerUiColor,
   getLayerId,
+  isTextCarrier,
+  isTextProxy,
+  isTextRoot,
   isToolLayer,
   LAYER_ORDER_KEY,
   LAYER_PALETTE,
@@ -72,7 +75,7 @@ export const DefaultLaserSettings = {
   output: true,
   includeInFrame: true,
   air: true,
-  constantPower: false,
+  constantPower: true,
   minPower: 15,
   fill: {
     floodFill: false,
@@ -269,7 +272,7 @@ export default class Work extends View {
     /////////////
 
     this.elCuts = new LabelPanel(this.rightSideTop.topPart);
-    this.elCuts.text = 'Elements';
+    this.elCuts.text = 'Layers';
 
     this.icFoldsAll = new Button(this.elCuts.label);
     this.icFoldsAll.position = 'absolute';
@@ -302,7 +305,7 @@ export default class Work extends View {
     /////////////
 
     this.settingsLP = new LabelPanel(this.rightSideTop.bottomPart);
-    this.settingsLP.text = 'Element Settings';
+    this.settingsLP.text = 'Layer Settings';
 
     /////////////
 
@@ -400,6 +403,8 @@ export default class Work extends View {
     if (layerTool.air === undefined) layerTool.air = true;
     if (layerTool.laserType === undefined) layerTool.laserType = ElementLaserType.Line;
     if (layerTool.speed === undefined) layerTool.speed = DefaultLaserSettings.speed;
+    if (layerTool.constantPower === undefined) layerTool.constantPower = !!DefaultLaserSettings.constantPower;
+    if (layerTool.minPower === undefined) layerTool.minPower = DefaultLaserSettings.minPower;
     if (layerTool.power === undefined) layerTool.power = DefaultLaserSettings.power;
     if (layerTool.passes === undefined) layerTool.passes = DefaultLaserSettings.passes;
     if (isToolLayer(layerId)) layerTool.output = false;
@@ -411,14 +416,17 @@ export default class Work extends View {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (!item || !item.laserSettings) continue;
+      const textCarrier = isTextCarrier(item);
       item.laserSettings.speed = layerTool.speed;
+      item.laserSettings.constantPower = !!layerTool.constantPower;
+      item.laserSettings.minPower = layerTool.minPower;
       item.laserSettings.power = layerTool.power;
       item.laserSettings.passes = layerTool.passes;
       item.laserSettings.air = layerTool.air;
       item.laserSettings.laserType = layerTool.laserType;
-      item.laserSettings.output = isToolLayer(layerId) ? false : !!layerTool.output;
-      item.laserSettings.includeInFrame = !!layerTool.includeInFrame;
-      item.visible = !!layerTool.visible;
+      item.laserSettings.output = textCarrier ? false : isToolLayer(layerId) ? false : !!layerTool.output;
+      item.laserSettings.includeInFrame = textCarrier ? false : !!layerTool.includeInFrame;
+      item.visible = textCarrier ? false : !!layerTool.visible;
       this.applyVisualStyle(item);
       item.opacity = this.getElementOpacity(item);
     }
@@ -480,9 +488,21 @@ export default class Work extends View {
     }
 
     for (let i = 0; i < targets.length; i++) {
-      this.canvas.applyLayerToElement(targets[i], layerId, layerColor, true);
-      const items = targets[i].children && targets[i].children.length ? targets[i].children : [targets[i]];
-      this.applyLayerToolToItems(layerId, items);
+      const target = targets[i];
+      this.canvas.applyLayerToElement(target, layerId, layerColor, true);
+      const linkedCarrierUid = target?.data?.carrierUid;
+      const linkedProxyUid = target?.data?.proxyUid;
+      const linkedRootUid = target?.data?.textRootUid;
+      if (linkedCarrierUid && this.canvas.elements[linkedCarrierUid]) {
+        this.canvas.applyLayerToElement(this.canvas.elements[linkedCarrierUid], layerId, layerColor, false);
+      }
+      if (linkedProxyUid && this.canvas.elements[linkedProxyUid]) {
+        this.canvas.applyLayerToElement(this.canvas.elements[linkedProxyUid], layerId, layerColor, false);
+      }
+      if (linkedRootUid && this.canvas.elements[linkedRootUid]) {
+        this.canvas.applyLayerToElement(this.canvas.elements[linkedRootUid], layerId, layerColor, true);
+      }
+      this.applyLayerToolToItems(layerId, this.collectLayerToolTargets(target));
     }
     this.updateLists();
     this.handleOnSelect(false);
@@ -497,24 +517,18 @@ export default class Work extends View {
 
     this.canvas.onEndEditText = (el, replace = false) => {
       this.canvas.paper.activate();
-      this.updateLists();
-
-      const mx = this.canvas.mirrorScalars.x;
-      const my = this.canvas.mirrorScalars.y;
-
-      if (this.canvas.editor.originalElementPosition) {
-        el.position = this.canvas.editor.originalElementPosition;
+      const textLayerId = (el && el.data && el.data.layerId) || this.canvas.currentLayerId || DEFAULT_LAYER_ID;
+      const textLayer = getLayerById(textLayerId);
+      this.canvas.applyLayerToElement(el, textLayer.id, textLayer.color, true);
+      this.applyLayerToolToItems(textLayer.id, this.collectLayerToolTargets(el));
+      const placement = this.canvas.getTextPlacementForCommit(el);
+      if (placement.useOriginalPosition) {
+        el.position = placement.position;
       } else {
-        el.pivot = [mx < 0 ? el.bounds.right : el.bounds.left, my < 0 ? el.bounds.bottom : el.bounds.top];
-        el.position = [
-          mx < 0
-            ? this.canvas.editor.startPoint.endX - el.data.textSettings.left
-            : this.canvas.editor.startPoint.x + el.data.textSettings.left,
-          my < 0
-            ? this.canvas.editor.startPoint.endY - el.data.textSettings.top
-            : this.canvas.editor.startPoint.y + el.data.textSettings.top,
-        ];
+        el.pivot = placement.pivot;
+        el.position = placement.position;
       }
+      this.updateLists();
 
       if (Number(this.tools.currentSelection) === ToolboxMode.Text) {
         this.tools.select(ToolboxMode.Select);
@@ -524,7 +538,30 @@ export default class Work extends View {
 
       this.canvas.toolbox.select.select(el);
       this.canvas.toolbox.select.updateSelection(true);
+      this.canvas.isPreviewChanged = true;
+      this.history.commit('Edit text');
     };
+  }
+
+  private collectLayerToolTargets(root: any) {
+    const result = [];
+    const seen = {};
+    const collect = (item) => {
+      if (!item) return;
+      if (item.uid && seen[item.uid]) return;
+      if (item.uid) seen[item.uid] = true;
+      if (item.laserSettings) result.push(item);
+      const linkedCarrierUid = item?.data?.carrierUid;
+      const linkedProxyUid = item?.data?.proxyUid;
+      const linkedRootUid = item?.data?.textRootUid;
+      if (linkedCarrierUid && this.canvas.elements[linkedCarrierUid]) collect(this.canvas.elements[linkedCarrierUid]);
+      if (linkedProxyUid && this.canvas.elements[linkedProxyUid]) collect(this.canvas.elements[linkedProxyUid]);
+      if (linkedRootUid && this.canvas.elements[linkedRootUid]) collect(this.canvas.elements[linkedRootUid]);
+      const children = item.children || [];
+      for (let i = 0; i < children.length; i++) collect(children[i]);
+    };
+    collect(root);
+    return result;
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -754,10 +791,12 @@ export default class Work extends View {
         if (isToolLayer(layerId)) continue;
         const layerTool = this.getLayerTool(layerId);
         const layerItems = this.getItemsForLayer(layerId);
-        const { power, speed, passes } = sets;
+        const { power, speed, passes, minPower, constantPower } = sets;
         if (sets.changed === 'power') layerTool.power = power;
         if (sets.changed === 'speed') layerTool.speed = speed;
         if (sets.changed === 'passes') layerTool.passes = passes;
+        if (sets.changed === 'minPower') layerTool.minPower = minPower;
+        if (sets.changed === 'constantPower') layerTool.constantPower = !!constantPower;
         this.applyLayerToolToItems(layerId, layerItems);
       }
       this.canvas.isPreviewChanged = true;
@@ -1073,6 +1112,7 @@ export default class Work extends View {
 
     this._topTools.showView(this.defaultTopTools);
     this._topToolsAux.showView(this.defaultPowerTopTools);
+    this.defaultPowerTopTools.showNoSelection();
 
     this.defaultTopTools.hideGrouping();
     this.designerIcons.hideExtraTools();
@@ -1086,23 +1126,20 @@ export default class Work extends View {
 
     if (selectedItems.length === 1) {
       const selectedItem = selectedItems[0];
+      const textSelected = this.canvas.resolveTextSelection ? this.canvas.resolveTextSelection(selectedItem) : null;
       if (selectedItem.kind === E_KIND_RECTANGLE) {
         this._topTools.showView(this.rectangleTools);
-        this._topToolsAux.showView(this.rectangleTools.powerIntervalTools);
-        this.rectangleTools.powerIntervalTools.fillOptionsVisible(
-          selectedItem.laserSettings.laserType === ElementLaserType.Fill,
-        );
         this.rectangleTools.element = selectedItem;
       }
       if (selectedItem.kind === E_KIND_IMAGE) {
         this._topTools.showView(this.imageTools);
-        this._topToolsAux.showView(this.imageTools.powerIntervalTools);
-        this.imageTools.powerIntervalTools.fillOptionsVisible(true);
         this.imageTools.element = selectedItem;
       }
-      if (selectedItem.kind === E_KIND_TEXT) {
+      if (selectedItem.kind === E_KIND_TEXT || textSelected) {
+        const textItem = textSelected || selectedItem;
         this._topTools.showView(this.textTools);
-        this.textTools.element = selectedItem;
+        this.textTools.element = textItem;
+        this.defaultPowerTopTools.showTextActions();
         return;
       }
       if (selectedItem.userGroup) {
@@ -1203,6 +1240,8 @@ export default class Work extends View {
     const laserSettings = this.getLayerTool(layerId);
     sets.name = selectedItems[0].uname;
     sets.speed = laserSettings.speed;
+    sets.constantPower = laserSettings.constantPower === undefined ? true : !!laserSettings.constantPower;
+    sets.minPower = laserSettings.minPower;
     sets.power = laserSettings.power;
     sets.passes = laserSettings.passes;
 
@@ -1244,6 +1283,9 @@ export default class Work extends View {
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   updateLists() {
+    if (this.canvas && typeof this.canvas.ensureTextLinkPairs === 'function') {
+      this.canvas.ensureTextLinkPairs();
+    }
     const projectLayerOrder = this.canvas?.objectsLayer?.data?.layerOrder;
     if (Array.isArray(projectLayerOrder) && projectLayerOrder.length) {
       this.layerOrder = projectLayerOrder.slice();
@@ -1334,13 +1376,23 @@ export default class Work extends View {
 
   private isListItem(child) {
     if (!child || !child.uid || child.uid === SELECT) return false;
+    if (isTextProxy(child)) return false;
+    if (isTextCarrier(child)) return false;
     if (!child.bounds || !child.bounds.width || !child.bounds.height) return false;
     if (child.kind === E_KIND_CURVE) return false;
-    if (child.children && child.children.length) return false;
+    if (child.children && child.children.length && !isTextRoot(child) && child.kind !== E_KIND_TEXT && !isTextProxy(child))
+      return false;
     return child.kind !== E_KIND_GROUP;
   }
 
   private ensureItemLayer(child) {
+    if (isTextCarrier(child)) {
+      child.visible = false;
+      if (!child.laserSettings) child.laserSettings = DeepCopy(DefaultLaserSettings);
+      child.laserSettings.output = false;
+      child.laserSettings.includeInFrame = false;
+      return ensureLayerData(child, this.canvas.currentLayerId || DEFAULT_LAYER_ID);
+    }
     if (!child.laserSettings) {
       child.laserSettings = DeepCopy(DefaultLaserSettings);
     }
@@ -1352,6 +1404,8 @@ export default class Work extends View {
     const layer = ensureLayerData(child, this.canvas.currentLayerId || DEFAULT_LAYER_ID);
     const layerTool = this.getLayerTool(layer.id);
     child.laserSettings.speed = layerTool.speed;
+    child.laserSettings.constantPower = !!layerTool.constantPower;
+    child.laserSettings.minPower = layerTool.minPower;
     child.laserSettings.power = layerTool.power;
     child.laserSettings.passes = layerTool.passes;
     child.laserSettings.air = layerTool.air;
@@ -1370,6 +1424,13 @@ export default class Work extends View {
 
   private applyVisualStyle(child) {
     if (!child) return;
+    if (isTextCarrier(child)) return;
+    if (isTextRoot(child)) {
+      const proxyUid = child?.data?.proxyUid;
+      const proxy = proxyUid ? this.canvas?.elements?.[proxyUid] : null;
+      if (proxy) this.applyVisualStyle(proxy);
+      return;
+    }
     const strokeColor = getElementColor(child);
     const isFill = child.laserSettings && child.laserSettings.laserType === ElementLaserType.Fill;
     if (child.strokeColor !== undefined) child.strokeColor = strokeColor;
@@ -1469,6 +1530,7 @@ export default class Work extends View {
   }
 
   private getElementOpacity(child) {
+    if (isTextCarrier(child)) return 0;
     if (child.visible === false) return 0;
     if (isToolLayer(getLayerId(child))) return NON_OUTPUT_OPACITY;
     if (!child.laserSettings || !child.laserSettings.output) return NON_OUTPUT_OPACITY;
@@ -1551,15 +1613,19 @@ export default class Work extends View {
       this.canvas.toolbox.select.ungroup();
     };
 
-    this.defaultTopTools.onUnGroup = () => {
-      this.canvas.toolbox.select.ungroup();
-    };
-
     this.defaultTopTools.onCombine = (itresectedOnly?: boolean) => {
       this.canvas.combineElement(itresectedOnly);
     };
 
     this.defaultTopTools.onOffset = ({ distance, cap, join }) => {
+      this.canvas.offsetElement({ distance, cap, join });
+    };
+
+    this.defaultPowerTopTools.onCombine = (itresectedOnly?: boolean) => {
+      this.canvas.combineElement(itresectedOnly);
+    };
+
+    this.defaultPowerTopTools.onOffset = ({ distance, cap, join }) => {
       this.canvas.offsetElement({ distance, cap, join });
     };
   }
@@ -1738,6 +1804,20 @@ export default class Work extends View {
         this.canvas.replaceElement(editorStatus.selectedText);
       }
     };
+
+    this.textTools.onConvertToPath = () => {
+      if (this.canvas.editor.visible) return;
+      const editorStatus = this.editorStatus;
+      if (editorStatus.isProhibited) return;
+      const converted = this.canvas.convertTextToPath(editorStatus.selectedText);
+      if (!converted) return;
+      this.canvas.isPreviewChanged = true;
+      this.updateLists();
+      this.handleUnselectAll();
+      this.canvas.toolbox.select.select(converted);
+      this.handleOnSelect();
+      this.history.commit('Convert text to path');
+    };
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1796,7 +1876,10 @@ export default class Work extends View {
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   get editorStatus() {
-    const selectedText = this.canvas.toolbox.select.selectedItems[0];
+    const selectedItem = this.canvas.toolbox.select.selectedItems[0];
+    const selectedText =
+      (this.canvas.resolveTextSelection && this.canvas.resolveTextSelection(selectedItem)) ||
+      (selectedItem && selectedItem.kind === E_KIND_TEXT ? selectedItem : null);
     return {
       isProhibited: !this.canvas.editor.visible && (!selectedText || selectedText.kind !== E_KIND_TEXT),
       selectedText,

@@ -34,8 +34,9 @@
 }
 
 .ec-layer-btn.active {
-  outline: 2px solid var(--cherry-primary-main);
+  outline: 3px solid var(--cherry-primary-main);
   outline-offset: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 10px var(--cherry-primary-main);
   opacity: 1;
 }
 

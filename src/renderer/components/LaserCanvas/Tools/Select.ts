@@ -6,6 +6,7 @@ import { DefaultLaserSettings, ElementLaserType } from '../../../App/views/Work/
 import { DeepCopy } from '../../../lib/api/cherry/api';
 import { codec64 } from '../../../lib/api/cherry/codec64';
 import { applyStrokeFill, getElementColor, checkImageInArea, readUni, writeUni } from '../../../modules/helpers';
+import { isTextCarrier, isTextProxy, isTextRoot } from '../../../modules/layers';
 import { Counters, E_KIND_GROUP, E_KIND_IMAGE, E_KIND_RASTER, E_KIND_TEXT } from '../CanvasElement';
 import {
   CENTER_GRID,
@@ -216,15 +217,25 @@ export default class Select {
 
     if (hit) {
       hitItem = hit.item;
+      const resolveTextRoot = (item: any) => {
+        let current = item;
+        while (current) {
+          if (isTextRoot(current)) return current;
+          current = current.parent;
+        }
+        return null;
+      };
+      const textRoot = resolveTextRoot(hitItem);
       if (e.event.altKey && hitItem.inGroup) {
         this.unselectAll();
         // hitItem.sel = false;
-        this.select(hitItem);
+        this.select(textRoot || hitItem);
         this.onAltSelect();
         return;
       }
       if (!hitItem.opacity) return;
-      if (hitItem.inGroup) hitItem = this.getParent(hitItem);
+      if (textRoot) hitItem = textRoot;
+      else if (hitItem.inGroup) hitItem = this.getParent(hitItem);
     }
 
     if (e.scaleCenter) {
@@ -507,8 +518,15 @@ export default class Select {
   filterSubGroups(items) {
     let result = [];
     for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.userGroup) {
+      let item = items[i];
+      if (!item) continue;
+      if ((isTextProxy(item) || isTextCarrier(item)) && item?.data?.textRootUid && window[ELEMENTS]) {
+        const root = window[ELEMENTS][item.data.textRootUid];
+        if (root && isTextRoot(root)) item = root;
+      }
+      // Keep text as atomic element when grouping with other objects.
+      // Otherwise text gets flattened to glyph curves and can no longer be edited.
+      if (item.userGroup && item.kind !== E_KIND_TEXT) {
         const sub = this.filterSubGroups(item.children);
         if (sub.length) result = result.concat(sub);
         continue;

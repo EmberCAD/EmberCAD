@@ -13,7 +13,7 @@ import Toolbox, { ToolboxMode } from './Tools/Toolbox';
 import { SELECT } from './Tools/Select';
 import CanvasVector from './CanvasVector';
 import { IElementProperties } from '../../App/views/Work/ElementProperties';
-import { E_KIND_IMAGE, E_KIND_TEXT, E_KIND_VECTOR } from './CanvasElement';
+import { E_KIND_GROUP, E_KIND_IMAGE, E_KIND_TEXT, E_KIND_VECTOR } from './CanvasElement';
 import CanvasImage from './CanvasImage';
 import { checkImageInArea, getElementColor, readUni, weld, writeUni } from '../../modules/helpers';
 import { AREA_HEIGHT, AREA_WIDTH } from '../../App/views/TopTools/LaserTools';
@@ -23,7 +23,19 @@ import { project } from 'paper/dist/paper-core';
 import Editor, { DefaultTextSettings } from '../../modules/Editor/Editor';
 import { codec64 } from '../../lib/api/cherry/codec64';
 import { DefaultLaserSettings } from '../../App/views/Work/Work';
-import { DEFAULT_LAYER_ID, ensureLayerData, findClosestLayer, getLayerById, setLayerData } from '../../modules/layers';
+import {
+  DEFAULT_LAYER_ID,
+  ensureLayerData,
+  findClosestLayer,
+  getLayerById,
+  isTextCarrier,
+  isTextProxy,
+  isTextRoot,
+  setLayerData,
+  TEXT_ROLE_CARRIER,
+  TEXT_ROLE_PROXY,
+  TEXT_ROLE_ROOT,
+} from '../../modules/layers';
 
 const BASE_SCALE = 'BASE_SCALE';
 const OFFSET = 'OFFSET';
@@ -173,6 +185,7 @@ export default class LaserCanvas {
   antiSnapDelay: boolean;
   editor: Editor;
   lastSelection: string = '';
+  private textEditContext: any = null;
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -544,40 +557,11 @@ export default class LaserCanvas {
     ///////////////////////////////////////////    //////////////////////////////////////////
 
     this.paper.view.onDoubleClick = (e) => {
-      let hit;
-      hit = this.toolbox.checkHit(e.point);
-
-      if (!hit || !hit.item || !hit.item.parent || !hit.item.parent.parent) return;
-      if (hit && !hit.item.opacity) return;
-
-      let textItem = hit.item.parent.parent;
-      if (textItem.kind !== E_KIND_TEXT) textItem = textItem.parent;
-      if (textItem.kind !== E_KIND_TEXT) textItem = textItem.parent; // repeated due to not welded text
-
-      if (textItem.kind === E_KIND_TEXT) {
-        const mx = this.mirrorScalars.x;
-        const my = this.mirrorScalars.y;
-
-        textItem.pivot = [
-          mx < 0 ? textItem.bounds.right : textItem.bounds.left,
-          my < 0 ? textItem.bounds.bottom : textItem.bounds.top,
-        ];
-
-        let x = textItem.position.x + textItem.data.textSettings.left * (mx < 0 ? 1 : -1);
-        let y = textItem.position.y + textItem.data.textSettings.top * (my < 0 ? 1 : -1);
-        this.editor.startPoint = {
-          x: mx < 0 ? this.centerGrid.bounds.width - x : x,
-          y: my < 0 ? this.centerGrid.bounds.height - y : y,
-          endX: x,
-          endY: y,
-        };
-        this.editor.paper.view.center = this.paper.view.center;
-        this.selectionBounds = null;
-        this.toolbox.select.unselectAll();
-
-        this.editor.edit(textItem);
-        this.resize();
-      }
+      const hit = this.toolbox.checkHit(e.point);
+      if (!hit || !hit.item || !hit.item.opacity) return;
+      const textItem = this.findTextAncestor(hit.item);
+      if (!textItem) return;
+      this.startTextEditSession(textItem);
     };
     ///////////////////////////////////////////    //////////////////////////////////////////
 
@@ -731,30 +715,414 @@ export default class LaserCanvas {
 
   ////////////////////////////////////////////////////////////////////////////////
 
-  replaceElement(textItem: any) {
-    if (!textItem || !textItem.uid) return;
-    const mx = this.mirrorScalars.x;
-    const my = this.mirrorScalars.y;
-
-    textItem.pivot = [
-      mx < 0 ? textItem.bounds.right : textItem.bounds.left,
-      my < 0 ? textItem.bounds.bottom : textItem.bounds.top,
-    ];
-    let x = textItem.position.x + textItem.data.textSettings.left * (mx < 0 ? 1 : -1);
-    let y = textItem.position.y + textItem.data.textSettings.top * (my < 0 ? 1 : -1);
+  private setEditorStartPointFromCanvas(x: number, y: number) {
+    const mapped = this.projectToEditorPoint(x, y);
     this.editor.startPoint = {
-      x: mx < 0 ? this.centerGrid.bounds.width - x : x,
-      y: my < 0 ? this.centerGrid.bounds.height - y : y,
+      x: mapped.x,
+      y: mapped.y,
       endX: x,
       endY: y,
     };
-    this.editor.paper.view.center = this.paper.view.center;
-    this.selectionBounds = null;
-    this.toolbox.select.unselectAll();
-    this.editor.edit(textItem);
-    this.editor.textSettings = textItem.data.textSettings;
+  }
+
+  private projectToEditorPoint(x: number, y: number) {
+    const mx = this.mirrorScalars.x;
+    const my = this.mirrorScalars.y;
+    const width = this.centerGrid?.bounds?.width || this.workingArea?.width || 0;
+    const height = this.centerGrid?.bounds?.height || this.workingArea?.height || 0;
+    return {
+      x: mx < 0 ? width - x : x,
+      y: my < 0 ? height - y : y,
+    };
+  }
+
+  private syncEditorViewFromMain() {
+    if (!this.editor || !this.editor.paper || !this.editor.paper.view || !this.paper || !this.paper.view) return;
+    const center = this.paper.view.center;
+    const mappedCenter = this.projectToEditorPoint(center.x, center.y);
+    this.editor.paper.activate();
+    this.editor.paper.view.scaling = {
+      x: this.scale,
+      y: this.scale,
+    };
+    this.editor.paper.view.setViewSize(this.width, this.height);
+    this.editor.paper.view.center = new this.editor.paper.Point(mappedCenter.x, mappedCenter.y);
+    this.paper.activate();
+  }
+
+  private findTextAncestor(item: any) {
+    let current = item;
+    while (current) {
+      if (isTextRoot(current) || isTextCarrier(current) || isTextProxy(current) || current.kind === E_KIND_TEXT) {
+        return current;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
+
+  private makeTextLinkId() {
+    return codec64.uId('text_');
+  }
+
+  private getTextProxy(item: any) {
+    if (!item) return null;
+    if (isTextProxy(item)) return item;
+    if (isTextRoot(item)) {
+      const children = item.children || [];
+      for (let i = 0; i < children.length; i++) {
+        if (isTextProxy(children[i])) return children[i];
+      }
+    }
+    const proxyUid = item?.data?.proxyUid;
+    if (proxyUid && this.elements[proxyUid]) return this.elements[proxyUid];
+    return item.kind === E_KIND_TEXT && !isTextCarrier(item) && !isTextRoot(item) ? item : null;
+  }
+
+  private getTextCarrier(item: any) {
+    if (!item) return null;
+    if (isTextCarrier(item)) return item;
+    if (isTextRoot(item)) {
+      const children = item.children || [];
+      for (let i = 0; i < children.length; i++) {
+        if (isTextCarrier(children[i])) return children[i];
+      }
+    }
+    const carrierUid = item?.data?.carrierUid;
+    if (carrierUid && this.elements[carrierUid]) return this.elements[carrierUid];
+    return null;
+  }
+
+  private getTextRoot(item: any) {
+    if (!item) return null;
+    if (isTextRoot(item)) return item;
+    const rootUid = item?.data?.textRootUid;
+    if (rootUid && this.elements[rootUid]) return this.elements[rootUid];
+    let current = item.parent;
+    while (current) {
+      if (isTextRoot(current)) return current;
+      current = current.parent;
+    }
+    return null;
+  }
+
+  private removeTextLinkArtifacts(context: any) {
+    if (!context) return;
+    const removeByUid = (uid: string) => {
+      if (!uid) return;
+      const entry = this.elements[uid];
+      if (entry && entry.remove) entry.remove();
+      if (this.elements[uid]) delete this.elements[uid];
+    };
+    removeByUid(context.rootUid);
+    removeByUid(context.proxyUid);
+    removeByUid(context.carrierUid);
+  }
+
+  private createTextCarrier(proxy: any, textSettings: any, layerId: string, layerColor: string, linkId: string) {
+    const b = proxy?.bounds;
+    const rect = [b?.x || proxy.position.x, b?.y || proxy.position.y, Math.max(b?.width || 1, 1), Math.max(b?.height || 1, 1)];
+    const carrier = new this.paper.Path.Rectangle(rect);
+    carrier.kind = E_KIND_TEXT;
+    carrier.uid = codec64.uId('text_carrier_');
+    carrier.userGroup = false;
+    carrier.uname = 'Text Carrier';
+    carrier.visible = false;
+    carrier.opacity = 0;
+    carrier.locked = true;
+    carrier.strokeColor = null;
+    carrier.fillColor = null;
+    carrier.laserSettings = DeepCopy(DefaultLaserSettings);
+    carrier.laserSettings.output = false;
+    carrier.laserSettings.includeInFrame = false;
+    if (!carrier.data) carrier.data = {};
+    carrier.data.textRole = TEXT_ROLE_CARRIER;
+    carrier.data.textLinkId = linkId;
+    carrier.data.textSettings = DeepCopy(textSettings || {});
+    carrier.data.layerId = layerId;
+    carrier.data.layerColor = layerColor;
+    return carrier;
+  }
+
+  private createTextRoot(proxy: any, carrier: any, layerId: string, layerColor: string, linkId: string) {
+    const root = new this.paper.Group([proxy, carrier]);
+    root.kind = E_KIND_TEXT;
+    root.uid = codec64.uId('text_root_');
+    root.type = E_KIND_GROUP;
+    root.userGroup = false;
+    root.uname = 'Text';
+    root.laserSettings = DeepCopy(proxy?.laserSettings || DefaultLaserSettings);
+    if (!root.data) root.data = {};
+    root.data.textRole = TEXT_ROLE_ROOT;
+    root.data.textLinkId = linkId;
+    root.data.layerId = layerId;
+    root.data.layerColor = layerColor;
+    root.data.proxyUid = proxy.uid;
+    root.data.carrierUid = carrier.uid;
+    root.data.textSettings = DeepCopy(proxy?.data?.textSettings || carrier?.data?.textSettings || {});
+    return root;
+  }
+
+  private stampTextPair(proxy: any, carrier: any, root: any, linkId: string) {
+    if (!proxy.data) proxy.data = {};
+    if (!carrier.data) carrier.data = {};
+    if (!root.data) root.data = {};
+    proxy.data.textRole = TEXT_ROLE_PROXY;
+    proxy.data.textLinkId = linkId;
+    proxy.data.carrierUid = carrier.uid;
+    proxy.data.textRootUid = root.uid;
+    proxy.data.textLogicalUid = root.uid;
+    proxy.inGroup = true;
+    carrier.data.textRole = TEXT_ROLE_CARRIER;
+    carrier.data.textLinkId = linkId;
+    carrier.data.proxyUid = proxy.uid;
+    carrier.data.textRootUid = root.uid;
+    carrier.data.textLogicalUid = root.uid;
+    carrier.inGroup = true;
+    root.data.textRole = TEXT_ROLE_ROOT;
+    root.data.textLinkId = linkId;
+    root.data.proxyUid = proxy.uid;
+    root.data.carrierUid = carrier.uid;
+    root.data.textRootUid = root.uid;
+    root.data.textLogicalUid = root.uid;
+    root.data.textSettings = DeepCopy(proxy?.data?.textSettings || carrier?.data?.textSettings || {});
+  }
+
+  private ensureTextRootForProxy(proxy: any) {
+    if (!proxy || !proxy.uid) return null;
+    if (!proxy.data) proxy.data = {};
+    if (!proxy.data.textSettings) return null;
+    const layerId = proxy?.data?.layerId || this.currentLayerId;
+    const layerColor = proxy?.data?.layerColor || this.currentLayerFill;
+
+    let carrier = this.getTextCarrier(proxy);
+    let root = this.getTextRoot(proxy);
+    let linkId = proxy?.data?.textLinkId || this.makeTextLinkId();
+    if (carrier && carrier?.data?.proxyUid && carrier.data.proxyUid !== proxy.uid) {
+      carrier = null;
+      linkId = this.makeTextLinkId();
+    }
+    if (root && root?.data?.proxyUid && root.data.proxyUid !== proxy.uid) {
+      root = null;
+      linkId = this.makeTextLinkId();
+    }
+    if (!carrier) {
+      carrier = this.createTextCarrier(proxy, proxy.data.textSettings, layerId, layerColor, linkId);
+      this.elements[carrier.uid] = carrier;
+    }
+    if (!root) {
+      const previousParent = proxy.parent && proxy.parent.uid !== SELECT ? proxy.parent : this.objectsLayer;
+      root = this.createTextRoot(proxy, carrier, layerId, layerColor, linkId);
+      previousParent.addChild(root);
+      root.inGroup = previousParent.uid !== this.objectsLayer.uid;
+      this.elements[root.uid] = root;
+    } else {
+      if (proxy.parent !== root) root.addChild(proxy);
+      if (carrier.parent !== root) root.addChild(carrier);
+    }
+    carrier.data.textSettings = DeepCopy(proxy.data.textSettings || carrier.data.textSettings || {});
+    carrier.position = proxy.position;
+    this.applyLayerToElement(carrier, layerId, layerColor, false);
+    carrier.laserSettings.output = false;
+    carrier.laserSettings.includeInFrame = false;
+    carrier.visible = false;
+    carrier.opacity = 0;
+    this.applyLayerToElement(root, layerId, layerColor, false);
+    this.stampTextPair(proxy, carrier, root, linkId);
+    this.elements[proxy.uid] = proxy;
+    this.elements[carrier.uid] = carrier;
+    this.elements[root.uid] = root;
+    return root;
+  }
+
+  ensureTextLinkPairs() {
+    const entries = this.elements || {};
+    const uids = Object.keys(entries);
+    const seenLink = {};
+    for (let i = 0; i < uids.length; i++) {
+      const item = entries[uids[i]];
+      if (!item || item.uid === SELECT) continue;
+      if (isTextCarrier(item)) continue;
+      if (isTextRoot(item)) continue;
+      if (item.kind === E_KIND_TEXT || isTextProxy(item)) {
+        const root = this.ensureTextRootForProxy(item);
+        const linkId = item?.data?.textLinkId;
+        if (linkId) seenLink[linkId] = true;
+        if (root?.data?.textLinkId) seenLink[root.data.textLinkId] = true;
+      }
+    }
+    const cleanupUids = Object.keys(entries);
+    for (let i = 0; i < cleanupUids.length; i++) {
+      const item = entries[cleanupUids[i]];
+      if (!isTextCarrier(item) && !isTextRoot(item)) continue;
+      const linkId = item?.data?.textLinkId;
+      const proxyUid = item?.data?.proxyUid || item?.data?.carrierUid;
+      if (proxyUid && this.elements[proxyUid]) continue;
+      if (linkId && seenLink[linkId]) continue;
+      if (item.remove) item.remove();
+      delete this.elements[item.uid];
+    }
+  }
+
+  private getTextStartPointForItem(textItem: any) {
+    const textSettings = textItem?.data?.textSettings || {};
+    const left = Number(textSettings.left) || 0;
+    const top = Number(textSettings.top) || 0;
+    const mx = this.mirrorScalars.x;
+    const my = this.mirrorScalars.y;
+    return {
+      x: mx < 0 ? textItem.position.x + left : textItem.position.x - left,
+      y: my < 0 ? textItem.position.y + top : textItem.position.y - top,
+    };
+  }
+
+  private startTextEditSession(textItem?: any) {
+    if (textItem && textItem.kind === E_KIND_TEXT) {
+      const proxy = this.getTextProxy(textItem) || textItem;
+      const root = this.getTextRoot(textItem) || this.ensureTextRootForProxy(proxy);
+      const carrier = this.getTextCarrier(textItem) || this.getTextCarrier(root);
+      const start = this.getTextStartPointForItem(proxy);
+      this.setEditorStartPointFromCanvas(start.x, start.y);
+      this.selectionBounds = null;
+      this.toolbox.select.unselectAll();
+      const editParent = root?.parent && root.parent.uid !== SELECT ? root.parent : this.objectsLayer;
+      this.textEditContext = {
+        linkId: root?.data?.textLinkId || carrier?.data?.textLinkId || proxy?.data?.textLinkId || this.makeTextLinkId(),
+        rootUid: root?.uid,
+        carrierUid: carrier?.uid,
+        proxyUid: proxy?.uid,
+        parentUid: editParent?.uid,
+      };
+      const source = carrier || proxy;
+      const editable = {
+        uid: source?.uid,
+        position: { x: proxy.position.x, y: proxy.position.y },
+        data: {
+          textSettings: DeepCopy(source?.data?.textSettings || proxy?.data?.textSettings || {}),
+          layerId: proxy?.data?.layerId || source?.data?.layerId || this.currentLayerId,
+          layerColor: proxy?.data?.layerColor || source?.data?.layerColor || this.currentLayerFill,
+          textLinkId: this.textEditContext.linkId,
+          rootUid: this.textEditContext.rootUid,
+          carrierUid: this.textEditContext.carrierUid,
+          proxyUid: this.textEditContext.proxyUid,
+        },
+        remove: () => {},
+      };
+      this.removeTextLinkArtifacts(this.textEditContext);
+      this.editor.edit(editable as any);
+    } else {
+      this.textEditContext = null;
+      this.editor.edit();
+    }
     this.resize();
+  }
+
+  getTextPlacementForCommit(textElement: any) {
+    if (this.editor?.originalElementPosition) {
+      return {
+        useOriginalPosition: true,
+        position: this.editor.originalElementPosition,
+      };
+    }
+
+    const mx = this.mirrorScalars.x;
+    const my = this.mirrorScalars.y;
+    const textSettings = textElement?.data?.textSettings || {};
+    const left = Number(textSettings.left) || 0;
+    const top = Number(textSettings.top) || 0;
+    const startPoint = this.editor?.startPoint || { x: 0, y: 0, endX: 0, endY: 0 };
+    const pivot = [
+      mx < 0 ? textElement.bounds.right : textElement.bounds.left,
+      my < 0 ? textElement.bounds.bottom : textElement.bounds.top,
+    ];
+    const position = [
+      mx < 0 ? startPoint.endX - left : startPoint.x + left,
+      my < 0 ? startPoint.endY - top : startPoint.y + top,
+    ];
+
+    return {
+      useOriginalPosition: false,
+      pivot,
+      position,
+    };
+  }
+
+  replaceElement(textItem: any) {
+    if (!textItem || !textItem.uid) return;
+    const root = this.getTextRoot(textItem);
+    const source = root || textItem;
+    this.startTextEditSession(textItem);
+    this.editor.textSettings = source.data.textSettings;
     this.editor.endEdit();
+  }
+
+  resolveTextSelection(item: any) {
+    if (!item) return null;
+    if (isTextRoot(item)) return item;
+    const proxy = this.getTextProxy(item);
+    if (proxy) {
+      return this.getTextRoot(proxy) || this.ensureTextRootForProxy(proxy);
+    }
+    return this.getTextRoot(item) || null;
+  }
+
+  convertTextToPath(textItem: any) {
+    const root = this.resolveTextSelection(textItem);
+    if (!root) return null;
+    const proxy = this.getTextProxy(root);
+    if (!proxy) return null;
+    const parent = root.parent && root.parent.uid !== SELECT ? root.parent : this.objectsLayer;
+    const parentUid = parent?.uid;
+    const wasInGroup = !!root.inGroup;
+
+    const vector = proxy.clone();
+    const reassignUid = (node: any) => {
+      if (!node) return;
+      node.uid = codec64.uId(node.userGroup ? 'group_' : 'element_');
+      const children = node.children || [];
+      for (let i = 0; i < children.length; i++) reassignUid(children[i]);
+    };
+    reassignUid(vector);
+    if (!vector.data) vector.data = {};
+    delete vector.data.textRole;
+    delete vector.data.textLinkId;
+    delete vector.data.carrierUid;
+    delete vector.data.proxyUid;
+    delete vector.data.textRootUid;
+    delete vector.data.textLogicalUid;
+    delete vector.data.textSettings;
+    vector.kind = E_KIND_VECTOR;
+    vector.type = E_KIND_VECTOR;
+    vector.userGroup = true;
+    vector.inGroup = false;
+    vector.strokeScaling = false;
+    vector.uname = (root.uname || 'Text') + ' Path';
+    if (vector.children && vector.children.length) {
+      for (let i = 0; i < vector.children.length; i++) {
+        const child = vector.children[i];
+        if (!child.data) child.data = {};
+        delete child.data.textRole;
+        delete child.data.textLinkId;
+        delete child.data.carrierUid;
+        delete child.data.proxyUid;
+        delete child.data.textRootUid;
+        delete child.data.textLogicalUid;
+        child.inGroup = true;
+      }
+    }
+
+    (parent || this.objectsLayer).addChild(vector);
+    vector.inGroup = wasInGroup;
+    if (parentUid) vector.currentParent = parentUid;
+    this.elements[vector.uid] = vector;
+
+    const context = {
+      rootUid: root.uid,
+      proxyUid: proxy.uid,
+      carrierUid: this.getTextCarrier(root)?.uid,
+    };
+    this.removeTextLinkArtifacts(context);
+    return vector;
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -766,23 +1134,34 @@ export default class LaserCanvas {
       this.paper.activate();
       const text = new CanvasVector(this.paper);
       await text.loadText(el.clone({ insert: false }));
-      const element = text.vector;
-      element.kind = E_KIND_TEXT;
-      element.userGroup = true;
-
-      element.data.textSettings = el.data.textSettings;
+      const proxy = text.vector;
+      proxy.kind = E_KIND_TEXT;
+      proxy.userGroup = false;
+      proxy.data.textRole = TEXT_ROLE_PROXY;
+      proxy.data.textSettings = el.data.textSettings;
       const sourceSettings = el.laserSettings ? DeepCopy(el.laserSettings) : DeepCopy(DefaultLaserSettings);
-      element.laserSettings = sourceSettings;
-      const sourceLayerId = el?.data?.layerId || this.currentLayerId;
-      const sourceLayerColor = el?.data?.layerColor || this.currentLayerFill;
-      this.applyLayerToElement(element, sourceLayerId, sourceLayerColor);
+      proxy.laserSettings = sourceSettings;
+      const sourceLayerId = el?.data?.editLayerId || el?.data?.layerId || this.currentLayerId;
+      const sourceLayerColor = el?.data?.editLayerColor || el?.data?.layerColor || this.currentLayerFill;
+      this.applyLayerToElement(proxy, sourceLayerId, sourceLayerColor);
 
-      this.elements[element.uid] = element;
-      this.objectsLayer.addChild(element);
+      const linkId = el?.data?.editTextLinkId || this.textEditContext?.linkId || this.makeTextLinkId();
+      const carrier = this.createTextCarrier(proxy, el.data.textSettings, sourceLayerId, sourceLayerColor, linkId);
+      const root = this.createTextRoot(proxy, carrier, sourceLayerId, sourceLayerColor, linkId);
+      this.stampTextPair(proxy, carrier, root, linkId);
+
+      this.elements[proxy.uid] = proxy;
+      this.elements[carrier.uid] = carrier;
+      this.elements[root.uid] = root;
+      const parentUid = this.textEditContext?.parentUid;
+      const parent = (parentUid && this.elements[parentUid]) || this.objectsLayer;
+      parent.addChild(root);
+      root.inGroup = parent.uid !== this.objectsLayer.uid;
 
       el.remove();
+      this.textEditContext = null;
 
-      if (typeof this.onEndEditText === 'function') this.onEndEditText(element, silentFlag);
+      if (typeof this.onEndEditText === 'function') this.onEndEditText(root, silentFlag);
     };
   }
 
@@ -833,21 +1212,9 @@ export default class LaserCanvas {
 
   handleTextToolMouseDown(e: any) {
     if (e.event.button !== 0) return;
-    this.editor.paper.view.center = this.paper.view.center;
-
     const { x, y } = this.calculateSnap(e);
-
-    const mx = this.mirrorScalars.x;
-    const my = this.mirrorScalars.y;
-    this.editor.startPoint = {
-      x: mx < 0 ? this.centerGrid.bounds.width - x : x,
-      y: my < 0 ? this.centerGrid.bounds.height - y : y,
-      endX: x,
-      endY: y,
-    };
-
-    this.editor.edit();
-    this.resize();
+    this.setEditorStartPointFromCanvas(x, y);
+    this.startTextEditSession();
 
     if (typeof this.onStartEdit === 'function') this.onStartEdit();
   }
@@ -1041,10 +1408,17 @@ export default class LaserCanvas {
     ensureLayerData(item, layer.id);
     setLayerData(item, layer.id, color);
 
-    if (item.strokeColor !== undefined) item.strokeColor = getElementColor(item);
-    if (item.fillColor !== undefined) {
-      const laserType = item?.laserSettings?.laserType;
-      item.fillColor = laserType === 2 ? getElementColor(item) : null;
+    if (isTextCarrier(item)) {
+      item.strokeColor = null;
+      item.fillColor = null;
+      item.visible = false;
+      item.opacity = 0;
+    } else if (!isTextRoot(item)) {
+      if (item.strokeColor !== undefined) item.strokeColor = getElementColor(item);
+      if (item.fillColor !== undefined) {
+        const laserType = item?.laserSettings?.laserType;
+        item.fillColor = laserType === 2 ? getElementColor(item) : null;
+      }
     }
 
     if (!recursive || !item.children || !item.children.length) return;
@@ -1179,9 +1553,7 @@ export default class LaserCanvas {
         (-this.offset.x * this.mirrorScalars.x) / this.scale,
         (-this.offset.y * this.mirrorScalars.y) / this.scale,
       );
-      this.editor.paper.activate();
-      this.editor.paper.view.scrollBy(-this.offset.x / this.scale, -this.offset.y / this.scale);
-      this.paper.activate();
+      this.syncEditorViewFromMain();
 
       this.addScale();
     }
@@ -2010,17 +2382,7 @@ export default class LaserCanvas {
 
     //////////////// editor
 
-    this.editor.paper.activate();
-    this.editor.paper.view.scaling = {
-      x: this.scale,
-      y: this.scale,
-    };
-
-    this.editor.paper.view.setViewSize(this.width, this.height);
-    if (offset) {
-      this.editor.paper.view.scrollBy(this.mirrorScalars.x * this.offset.x, this.mirrorScalars.y * this.offset.y);
-    }
-    this.paper.activate();
+    this.syncEditorViewFromMain();
 
     if (offset) {
       this.offset = { x: 0, y: 0 };
@@ -2551,6 +2913,8 @@ export default class LaserCanvas {
     window[ELEMENTS] = elements;
     window[IMAGES] = images;
     window[VECTORS] = vectors;
+
+    this.ensureTextLinkPairs();
 
     if (forceViewUpdate && this.paper?.view?.update) {
       this.paper.view.update(true);

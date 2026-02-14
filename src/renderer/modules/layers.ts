@@ -4,6 +4,9 @@
 export const DEFAULT_LAYER_ID = '00';
 export const TOOL_LAYER_IDS = ['T1', 'T2'];
 export const LAYER_ORDER_KEY = 'LAYER_ORDER';
+export const TEXT_ROLE_CARRIER = 'carrier';
+export const TEXT_ROLE_PROXY = 'proxy';
+export const TEXT_ROLE_ROOT = 'root';
 
 export type LayerDef = {
   id: string;
@@ -219,4 +222,20 @@ export function isDrawableItem(item: any) {
   if (!item || !item.uid || item.uid === 'select') return false;
   if (!item.bounds || !item.bounds.width || !item.bounds.height) return false;
   return true;
+}
+
+export function getTextRole(item: any) {
+  return item?.data?.textRole || null;
+}
+
+export function isTextCarrier(item: any) {
+  return getTextRole(item) === TEXT_ROLE_CARRIER;
+}
+
+export function isTextProxy(item: any) {
+  return getTextRole(item) === TEXT_ROLE_PROXY;
+}
+
+export function isTextRoot(item: any) {
+  return getTextRole(item) === TEXT_ROLE_ROOT;
 }

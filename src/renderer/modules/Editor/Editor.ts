@@ -76,6 +76,13 @@ export default class Editor {
   fontFile: any;
   silentApply: boolean;
   originalElementPosition: any;
+  private _editLayerMeta: {
+    layerId?: string;
+    layerColor?: string;
+    textLinkId?: string;
+    carrierUid?: string;
+    proxyUid?: string;
+  } | null;
 
   constructor(private parent) {
     this.init();
@@ -409,6 +416,19 @@ export default class Editor {
     this.editorGroup = new this.paper.Group();
     this.editorGroup.bounds.height = this.size;
     this.editorGroup.bounds.width = this.size;
+    if (!this.editorGroup.data) this.editorGroup.data = {};
+    delete this.editorGroup.data.editLayerId;
+    delete this.editorGroup.data.editLayerColor;
+    delete this.editorGroup.data.editTextLinkId;
+    delete this.editorGroup.data.editCarrierUid;
+    delete this.editorGroup.data.editProxyUid;
+    if (this._editLayerMeta) {
+      this.editorGroup.data.editLayerId = this._editLayerMeta.layerId;
+      this.editorGroup.data.editLayerColor = this._editLayerMeta.layerColor;
+      this.editorGroup.data.editTextLinkId = this._editLayerMeta.textLinkId;
+      this.editorGroup.data.editCarrierUid = this._editLayerMeta.carrierUid;
+      this.editorGroup.data.editProxyUid = this._editLayerMeta.proxyUid;
+    }
 
     if (this._shouldApplyToolSettings) {
       this._shouldApplyToolSettings = false;
@@ -488,8 +508,16 @@ export default class Editor {
     this.lines = [];
     this.currentCursorPosition = { x: 0, y: 0 };
     this.originalElementPosition = null;
+    this._editLayerMeta = null;
     if (item && item.data && item.data.textSettings) {
       this.originalElementPosition = [item.position.x, item.position.y];
+      this._editLayerMeta = {
+        layerId: item?.data?.layerId,
+        layerColor: item?.data?.layerColor,
+        textLinkId: item?.data?.textLinkId,
+        carrierUid: item?.data?.carrierUid || item?.uid,
+        proxyUid: item?.data?.proxyUid || item?.uid,
+      };
       this.textTools.textSettings = DeepCopy(item.data.textSettings);
       this.text = item.data.textSettings.lines;
       this.applyTextSettings();
@@ -512,7 +540,7 @@ export default class Editor {
     this.spaceY = this.textTools.textSettings.spaceY;
     this.trim = this.textTools.textSettings.trim;
     this.upperCase = this.textTools.textSettings.allCaps;
-    this.weld = this.textTools.textSettings.combine;
+    this.weld = this.textTools.textSettings.weld ?? this.textTools.textSettings.combine;
 
     this.silentApply = false;
   }
@@ -541,7 +569,7 @@ export default class Editor {
     this.spaceY = element.data.textSettings.spaceY;
     this.trim = element.data.textSettings.trim;
     this.upperCase = element.data.textSettings.allCaps;
-    this.weld = element.data.textSettings.combine;
+    this.weld = element.data.textSettings.weld ?? element.data.textSettings.combine;
     this.silentApply = false;
   }
 
