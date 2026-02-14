@@ -513,9 +513,7 @@ export default class GCode {
       if (params && params.passes) passes = params.passes;
 
       if (kind !== E_KIND_IMAGE) {
-        const shouldRasterFill =
-          isFill &&
-          (isText || (!item.userGroup && !item.inGroup) || (item.userGroup && !item.currentParent));
+        const shouldRasterFill = isFill && (isText || !item.userGroup || (item.userGroup && !item.currentParent));
 
         if (shouldRasterFill) {
           this.GCodeShape = FillToGcode(item);

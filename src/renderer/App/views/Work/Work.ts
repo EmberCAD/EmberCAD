@@ -413,23 +413,30 @@ export default class Work extends View {
 
   private applyLayerToolToItems(layerId: string, items: any[]) {
     const layerTool = this.getLayerTool(layerId);
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item || !item.laserSettings) continue;
-      const textCarrier = isTextCarrier(item);
-      item.laserSettings.speed = layerTool.speed;
-      item.laserSettings.constantPower = !!layerTool.constantPower;
-      item.laserSettings.minPower = layerTool.minPower;
-      item.laserSettings.power = layerTool.power;
-      item.laserSettings.passes = layerTool.passes;
-      item.laserSettings.air = layerTool.air;
-      item.laserSettings.laserType = layerTool.laserType;
-      item.laserSettings.output = textCarrier ? false : isToolLayer(layerId) ? false : !!layerTool.output;
-      item.laserSettings.includeInFrame = textCarrier ? false : !!layerTool.includeInFrame;
-      item.visible = textCarrier ? false : !!layerTool.visible;
-      this.applyVisualStyle(item);
-      item.opacity = this.getElementOpacity(item);
-    }
+    const seen = {};
+    const applyOne = (item: any) => {
+      if (!item || !item.uid || seen[item.uid]) return;
+      seen[item.uid] = true;
+      if (!item.laserSettings) item.laserSettings = DeepCopy(DefaultLaserSettings);
+      if (getLayerId(item) === layerId) {
+        const textCarrier = isTextCarrier(item);
+        item.laserSettings.speed = layerTool.speed;
+        item.laserSettings.constantPower = !!layerTool.constantPower;
+        item.laserSettings.minPower = layerTool.minPower;
+        item.laserSettings.power = layerTool.power;
+        item.laserSettings.passes = layerTool.passes;
+        item.laserSettings.air = layerTool.air;
+        item.laserSettings.laserType = layerTool.laserType;
+        item.laserSettings.output = textCarrier ? false : isToolLayer(layerId) ? false : !!layerTool.output;
+        item.laserSettings.includeInFrame = textCarrier ? false : !!layerTool.includeInFrame;
+        item.visible = textCarrier ? false : !!layerTool.visible;
+        this.applyVisualStyle(item);
+        item.opacity = this.getElementOpacity(item);
+      }
+      const children = item.children || [];
+      for (let j = 0; j < children.length; j++) applyOne(children[j]);
+    };
+    for (let i = 0; i < items.length; i++) applyOne(items[i]);
   }
 
   private initLayerPalette() {
@@ -1064,7 +1071,8 @@ export default class Work extends View {
     const uids = Object.keys(elements);
     for (let i = 0; i < uids.length; i++) {
       const item = elements[uids[i]];
-      if (!item || !this.isListItem(item)) continue;
+      if (!item || !item.uid || item.uid === SELECT) continue;
+      if (isTextProxy(item) || isTextCarrier(item)) continue;
       if (getLayerId(item) === layerId) fallback.push(item);
     }
     return fallback;
@@ -1327,20 +1335,23 @@ export default class Work extends View {
     for (let i = 0; i < selectionChildren.length; i++) collectItems(selectionChildren[i]);
 
     const layerBuckets = {};
+    const layerAllBuckets = {};
     for (let i = 0; i < allItems.length; i++) {
       const child = allItems[i];
-      if (!this.isListItem(child)) continue;
       this.ensureItemLayer(child);
       child.opacity = this.getElementOpacity(child);
       const layerId = getLayerId(child);
+      if (!layerAllBuckets[layerId]) layerAllBuckets[layerId] = [];
+      layerAllBuckets[layerId].push(child);
+      if (!this.isListItem(child)) continue;
       if (!layerBuckets[layerId]) layerBuckets[layerId] = [];
       layerBuckets[layerId].push(child);
     }
 
-    const usedLayers = this.layerOrder.filter((layerId) => layerBuckets[layerId] && layerBuckets[layerId].length);
+    const usedLayers = this.layerOrder.filter((layerId) => layerAllBuckets[layerId] && layerAllBuckets[layerId].length);
     const usedSet = {};
     for (let i = 0; i < usedLayers.length; i++) usedSet[usedLayers[i]] = true;
-    const remaining = Object.keys(layerBuckets)
+    const remaining = Object.keys(layerAllBuckets)
       .filter((layerId) => !usedSet[layerId])
       .sort((a, b) => getLayerById(a).index - getLayerById(b).index);
     const orderedLayers = [...usedLayers, ...remaining];
@@ -1348,10 +1359,11 @@ export default class Work extends View {
     this.layerItemsMap = {};
     for (let i = 0; i < orderedLayers.length; i++) {
       const layerId = orderedLayers[i];
-      const items = layerBuckets[layerId];
+      const items = layerAllBuckets[layerId] || [];
       this.applyLayerToolToItems(layerId, items);
       this.layerItemsMap[layerId] = items.slice();
-      const layerColumns = this.getLayerColumns(layerId, items);
+      const listItems = layerBuckets[layerId] || [];
+      const layerColumns = this.getLayerColumns(layerId, listItems);
       const layerDef = getLayerById(layerId);
       const label = isToolLayer(layerId) ? `Tool ${layerDef.id}` : layerDef.id;
       this.cutList.addBin({
