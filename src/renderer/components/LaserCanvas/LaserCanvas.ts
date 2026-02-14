@@ -829,7 +829,8 @@ export default class LaserCanvas {
     carrier.uname = 'Text Carrier';
     carrier.visible = false;
     carrier.opacity = 0;
-    carrier.locked = true;
+    // Carrier must follow group transforms; keep it hidden/non-output instead of locked.
+    carrier.locked = false;
     carrier.strokeColor = null;
     carrier.fillColor = null;
     carrier.laserSettings = DeepCopy(DefaultLaserSettings);
@@ -922,6 +923,7 @@ export default class LaserCanvas {
     }
     carrier.data.textSettings = DeepCopy(proxy.data.textSettings || carrier.data.textSettings || {});
     carrier.position = proxy.position;
+    carrier.locked = false;
     this.applyLayerToElement(carrier, layerId, layerColor, false);
     carrier.laserSettings.output = false;
     carrier.laserSettings.includeInFrame = false;
