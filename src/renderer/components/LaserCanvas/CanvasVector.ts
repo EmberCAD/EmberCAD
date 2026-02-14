@@ -53,6 +53,7 @@ export default class CanvasVector extends CanvasElement {
         element.uname = path.basename(fileName); //tr(E_KIND_VECTOR) + ' ' + ++Counters.Vectors;
 
         this.prepareElement(element);
+        this.normalizeImportedSvgRoot(this.vector);
         temp.remove();
         temp = null;
         resolve();
@@ -60,6 +61,39 @@ export default class CanvasVector extends CanvasElement {
         reject(error);
       }
     });
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////
+
+  private normalizeImportedSvgRoot(root: any) {
+    if (!root || root.kind !== E_KIND_VECTOR || !root.userGroup) return;
+    const children = root.children || [];
+    if (!children.length) return;
+
+    const drawableChildren = children.filter((child) => child && !child.clipMask);
+    if (drawableChildren.length !== 1) return;
+
+    const wrapper = drawableChildren[0];
+    if (!wrapper || !wrapper.children || !wrapper.children.length) return;
+    if (wrapper.kind !== E_KIND_GROUP && wrapper.kind !== E_KIND_VECTOR) return;
+
+    // One-level SVG import normalization:
+    // if imported root is only a wrapper group, lift wrapper children once.
+    // Keep deeper hierarchy unchanged.
+    try {
+      const wrapperChildren = (wrapper.children || []).slice();
+      let movedCount = 0;
+      for (let i = 0; i < wrapperChildren.length; i++) {
+        const child = wrapperChildren[i];
+        if (!child || child.clipMask) continue;
+        root.addChild(child);
+        movedCount++;
+      }
+      if (movedCount > 0) wrapper.remove();
+    } catch (error) {
+      // Fallback-safe: keep original hierarchy unchanged on malformed SVG wrappers.
+      console.warn('SVG root normalization skipped:', error);
+    }
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////
