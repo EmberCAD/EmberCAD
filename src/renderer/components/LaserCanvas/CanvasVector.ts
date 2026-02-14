@@ -140,6 +140,7 @@ export default class CanvasVector extends CanvasElement {
         element.fitBounds(0, 0, (element.bounds.width / scale) * 25.4, (element.bounds.height / scale) * 25.4);
 
     element.userGroup = true;
+    element.kind = E_KIND_VECTOR;
     element.type = E_KIND_VECTOR;
 
     this.rasterized = false;
@@ -164,6 +165,7 @@ export default class CanvasVector extends CanvasElement {
       paperGroup.inGroup = true;
       paperGroup.sel = false;
       paperGroup.uid = codec64.uId('group_');
+      paperGroup.kind = E_KIND_GROUP;
       paperGroup.type = E_KIND_VECTOR;
       paperGroup.uname =
         `<span style="border:1px solid #444;margin-right:0.5rem;min-width:1.5rem;background-color:${groups[i]}"></span>` +
@@ -184,6 +186,7 @@ export default class CanvasVector extends CanvasElement {
       paperGroup.inGroup = true;
       paperGroup.sel = false;
       paperGroup.uid = codec64.uId('group_');
+      paperGroup.kind = E_KIND_GROUP;
       paperGroup.type = E_KIND_VECTOR;
       paperGroup.uname =
         `<span style="border:1px solid #444;margin-right:0.5rem;min-width:1.5rem;background-color:${groups[i]}"></span>` +
@@ -247,6 +250,7 @@ export default class CanvasVector extends CanvasElement {
 
       if (child.children && child.children.length) {
         child.userGroup = true;
+        child.kind = E_KIND_GROUP;
         child.uname = tr(E_KIND_GROUP);
         this.groupChildren(child);
       }
