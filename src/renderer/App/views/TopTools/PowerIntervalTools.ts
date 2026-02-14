@@ -221,15 +221,22 @@ export default class PowerIntervalTools {
   fillProps(laserSettings) {
     if (!this.element) return;
 
+    if (!laserSettings.fill) laserSettings.fill = {};
+    let lineInterval = Number(laserSettings.fill.lineInterval);
+    if (!Number.isFinite(lineInterval) || lineInterval <= 0) {
+      lineInterval = 0.2;
+      laserSettings.fill.lineInterval = lineInterval;
+    }
+
     const DPIin = Math.round(this.element.width / (this.element.bounds.width / 25.4)) || '---';
-    const DPIout = Math.round(1 / mmToInch(laserSettings.fill.lineInterval));
+    const DPIout = Math.round(1 / mmToInch(lineInterval)) || 127;
 
     this.constantPower.checked = laserSettings.constantPower === undefined ? true : !!laserSettings.constantPower;
 
     this.minPower.input.text = laserSettings.minPower;
     this.maxPower.input.text = laserSettings.power;
     this.dpiIn.text = `${DPI_IN} ${DPIin}`;
-    this.interval.input.text = laserSettings.fill.lineInterval;
+    this.interval.input.text = lineInterval;
     this.dpiOut.input.text = DPIout;
     this.overscan.checked = laserSettings.fill.overscan;
     this.overscanValue.input.text = laserSettings.fill.overscanValue;
