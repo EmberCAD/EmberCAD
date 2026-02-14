@@ -1387,8 +1387,11 @@ export default class Work extends View {
       if (!child.bounds || !child.bounds.width || !child.bounds.height) return false;
     }
     if (child.kind === E_KIND_CURVE) return false;
-    if (child.children && child.children.length && !isTextRoot(child) && child.kind !== E_KIND_TEXT && !isTextProxy(child))
-      return false;
+    if (child.children && child.children.length) {
+      const allowComposite =
+        isTextRoot(child) || child.kind === E_KIND_TEXT || child.kind === E_KIND_VECTOR || child.kind === E_KIND_IMAGE;
+      if (!allowComposite) return false;
+    }
     return child.kind !== E_KIND_GROUP;
   }
 

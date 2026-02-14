@@ -1380,7 +1380,17 @@ export default class LaserCanvas {
 
   private resolveImportedColor(item: any) {
     if (!item) return null;
-    const cssColor = item?.data?.strokeColor || item?.data?.fillColor;
+    const toCss = (c: any) => {
+      if (!c) return null;
+      if (typeof c === 'string') return c;
+      if (typeof c.toCSS === 'function') return c.toCSS();
+      return null;
+    };
+    const cssColor =
+      item?.data?.strokeColor ||
+      item?.data?.fillColor ||
+      toCss(item?.strokeColor) ||
+      toCss(item?.fillColor);
     return cssColor || null;
   }
 
@@ -1400,12 +1410,27 @@ export default class LaserCanvas {
     walk(root);
     if (!drawable.length) return;
 
+    const uniqueColors = {};
+    let uniqueCount = 0;
+    for (let i = 0; i < drawable.length; i++) {
+      const color = this.resolveImportedColor(drawable[i]);
+      if (!color || uniqueColors[color]) continue;
+      uniqueColors[color] = true;
+      uniqueCount++;
+    }
+
+    // Single-color imports should follow currently active layer.
+    if (uniqueCount <= 1) {
+      this.applyLayerToElement(root, this.currentLayerId, this.currentLayerFill, true);
+      return;
+    }
+
     let colored = 0;
     for (let i = 0; i < drawable.length; i++) {
       const item = drawable[i];
       const sourceColor = this.resolveImportedColor(item);
       if (!sourceColor) continue;
-      const layer = findClosestLayer(sourceColor, true);
+      const layer = findClosestLayer(sourceColor, false);
       this.applyLayerToElement(item, layer.id, layer.color, false);
       colored++;
     }
