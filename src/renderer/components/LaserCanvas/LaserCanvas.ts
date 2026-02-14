@@ -690,13 +690,12 @@ export default class LaserCanvas {
     };
 
     this.toolbox.onUnselectAll = () => {
-      if (this.selectionBounds) {
-        this.selectionBounds = null;
-        this.handles = {};
-        this.updateSelection();
-        this.resetMouseActions();
-        if (typeof this.onUnselectAll === 'function') this.onUnselectAll();
-      }
+      this.selectionBounds = null;
+      this.handles = {};
+      this.updateSelection();
+      this.resetMouseActions();
+      this.lastSelection = '';
+      if (typeof this.onUnselectAll === 'function') this.onUnselectAll();
     };
 
     ///////////////////////////////////
@@ -1499,6 +1498,14 @@ export default class LaserCanvas {
       this.objectsLayer.strokeColor = window[CURRENT_THEME].object.strokeColor;
       this.setTool(this.prevTool || ToolboxMode.Select);
       this.objectsLayer.activate();
+      // Force UI selection resync after returning from Laser view.
+      // Without this, first click can be ignored by same-selection dedupe.
+      this.lastSelection = '__view_switch__';
+      if (this.toolbox?.select?.selectedItems?.length) {
+        if (typeof this.onSelect === 'function') this.onSelect();
+      } else {
+        if (typeof this.onUnselectAll === 'function') this.onUnselectAll();
+      }
     }
     this.resize(NO_OFFSET);
   }
