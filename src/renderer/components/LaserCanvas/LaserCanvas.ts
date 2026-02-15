@@ -13,7 +13,7 @@ import Toolbox, { ToolboxMode } from './Tools/Toolbox';
 import { SELECT } from './Tools/Select';
 import CanvasVector from './CanvasVector';
 import { IElementProperties } from '../../App/views/Work/ElementProperties';
-import { E_KIND_GROUP, E_KIND_IMAGE, E_KIND_TEXT, E_KIND_VECTOR } from './CanvasElement';
+import { E_KIND_CURVE, E_KIND_GROUP, E_KIND_IMAGE, E_KIND_TEXT, E_KIND_VECTOR } from './CanvasElement';
 import CanvasImage from './CanvasImage';
 import { checkImageInArea, getElementColor, readUni, weld, writeUni } from '../../modules/helpers';
 import { AREA_HEIGHT, AREA_WIDTH } from '../../App/views/TopTools/LaserTools';
@@ -1398,6 +1398,7 @@ export default class LaserCanvas {
     if (!value) return null;
     value = String(value).trim().toLowerCase();
     if (!value || value === 'none' || value === 'transparent') return null;
+    if (value.startsWith('url(')) return null;
     if (value.indexOf('nan') > -1) return null;
     if (value.startsWith('rgba')) {
       const alpha = Number(value.replace(/rgba\(([^)]+)\)/i, '$1').split(',')[3]?.trim());
@@ -1406,7 +1407,21 @@ export default class LaserCanvas {
     return value;
   }
 
-  private resolveImportedStrokeColor(item: any) {
+  private resolveImportedStrokeToken(item: any) {
+    if (!item) return 'none';
+    const metaType = item?.data?.importStrokeType;
+    if (metaType === 'solid' || metaType === 'paint-server' || metaType === 'none') return metaType;
+    const raw = item?.strokeColor;
+    let value = null;
+    if (typeof raw === 'string') value = raw;
+    else if (raw && typeof raw.toCSS === 'function') value = raw.toCSS();
+    value = value ? String(value).trim().toLowerCase() : '';
+    if (!value || value === 'none' || value === 'transparent') return 'none';
+    if (value.startsWith('url(')) return 'paint-server';
+    return 'solid';
+  }
+
+  private resolveSolidImportedStrokeColor(item: any) {
     if (!item) return null;
     const metadataStroke = this.normalizeImportedColor(item?.data?.importStrokeColor);
     if (metadataStroke) return metadataStroke;
@@ -1428,12 +1443,14 @@ export default class LaserCanvas {
       const hasChildren = !!(item.children && item.children.length);
       if (hasChildren) {
         for (let i = 0; i < item.children.length; i++) walk(item.children[i]);
+        return;
       }
       if (item === root) return;
       if (item?.uid === SELECT) return;
       if (isTextCarrier(item) || isTextRoot(item)) return;
       if (!item?.uid || !item?.bounds || !item.bounds.width || !item.bounds.height) return;
       if (item.clipMask) return;
+      if (item.kind !== E_KIND_CURVE && item.kind !== E_KIND_IMAGE && item.type !== E_KIND_VECTOR) return;
       if (seen[item.uid]) return;
       seen[item.uid] = true;
       targets.push(item);
@@ -1450,31 +1467,52 @@ export default class LaserCanvas {
       return;
     }
 
-    const uniqueColors = {};
-    let uniqueCount = 0;
+    const uniqueSolidColors = {};
+    let uniqueSolidCount = 0;
     for (let i = 0; i < targets.length; i++) {
-      const color = this.resolveImportedStrokeColor(targets[i]);
-      if (!color || uniqueColors[color]) continue;
-      uniqueColors[color] = true;
-      uniqueCount++;
+      const color = this.resolveSolidImportedStrokeColor(targets[i]);
+      if (!color || uniqueSolidColors[color]) continue;
+      uniqueSolidColors[color] = true;
+      uniqueSolidCount++;
     }
 
-    // Single-color imports should follow currently active layer.
-    if (uniqueCount <= 1) {
-      this.applyLayerToElement(root, this.currentLayerId, this.currentLayerFill, true);
-      return;
-    }
-
-    this.applyLayerToElement(root, this.currentLayerId, this.currentLayerFill, false);
+    const layerCounts = {};
+    const zeroLayer = getLayerById('00');
     for (let i = 0; i < targets.length; i++) {
       const item = targets[i];
-      const sourceColor = this.resolveImportedStrokeColor(item);
-      if (!sourceColor) {
-        this.applyLayerToElement(item, this.currentLayerId, this.currentLayerFill, false);
+      let layer = zeroLayer;
+      if (uniqueSolidCount > 0) {
+        const sourceColor = this.resolveSolidImportedStrokeColor(item);
+        const strokeType = this.resolveImportedStrokeToken(item);
+        if (sourceColor && strokeType === 'solid') {
+          layer = findClosestLayer(sourceColor, false);
+        }
+      }
+      this.applyLayerToElement(item, layer.id, layer.color, false);
+      layerCounts[layer.id] = (layerCounts[layer.id] || 0) + 1;
+    }
+
+    let dominantLayerId = this.currentLayerId || zeroLayer.id;
+    let dominantCount = -1;
+    const keys = Object.keys(layerCounts);
+    for (let i = 0; i < keys.length; i++) {
+      const layerId = keys[i];
+      const count = layerCounts[layerId];
+      if (count > dominantCount) {
+        dominantCount = count;
+        dominantLayerId = layerId;
         continue;
       }
-      const layer = findClosestLayer(sourceColor, false);
-      this.applyLayerToElement(item, layer.id, layer.color, false);
+      if (count === dominantCount) {
+        const a = getLayerById(layerId).index;
+        const b = getLayerById(dominantLayerId).index;
+        if (a < b) dominantLayerId = layerId;
+      }
+    }
+
+    if (root) {
+      const dominantLayer = getLayerById(dominantLayerId);
+      this.applyLayerToElement(root, dominantLayer.id, dominantLayer.color, false);
     }
   }
 

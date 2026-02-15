@@ -73,12 +73,25 @@ export default class CanvasVector extends CanvasElement {
     if (!value) return null;
     value = String(value).trim().toLowerCase();
     if (!value || value === 'none' || value === 'transparent') return null;
+    if (value.startsWith('url(')) return null;
     if (value.indexOf('nan') > -1) return null;
     if (value.startsWith('rgba')) {
       const alpha = Number(value.replace(/rgba\(([^)]+)\)/i, '$1').split(',')[3]?.trim());
       if (!Number.isNaN(alpha) && alpha <= 0) return null;
     }
     return value;
+  }
+
+  private classifyImportedStroke(color: any) {
+    let value = null;
+    if (typeof color === 'string') value = color;
+    else if (color && typeof color.toCSS === 'function') value = color.toCSS();
+    value = value ? String(value).trim().toLowerCase() : '';
+    if (!value || value === 'none' || value === 'transparent') return { type: 'none', color: null };
+    if (value.startsWith('url(')) return { type: 'paint-server', color: null };
+    const solid = this.normalizeImportedColor(value);
+    if (!solid) return { type: 'none', color: null };
+    return { type: 'solid', color: solid };
   }
 
   private normalizeImportedSvgRoot(root: any) {
@@ -283,11 +296,12 @@ export default class CanvasVector extends CanvasElement {
       child.uname = tr(E_KIND_CURVE) + ' ' + ++Counters.Curves;
       if (!child.data) child.data = {};
 
-      const importStrokeColor = this.normalizeImportedColor(child.strokeColor);
-      child.data.importHadStroke = !!importStrokeColor;
-      if (importStrokeColor) {
-        child.data.importStrokeColor = importStrokeColor;
-        child.data.strokeColor = importStrokeColor;
+      const sourceStroke = this.classifyImportedStroke(child.strokeColor);
+      child.data.importStrokeType = sourceStroke.type;
+      child.data.importHadStroke = sourceStroke.type !== 'none';
+      if (sourceStroke.color) {
+        child.data.importStrokeColor = sourceStroke.color;
+        child.data.strokeColor = sourceStroke.color;
       }
 
       if (child.closed) {

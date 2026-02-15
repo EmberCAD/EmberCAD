@@ -1457,6 +1457,7 @@ export default class Work extends View {
     if (!child || !child.uid || child.uid === SELECT) return false;
     if (isTextCarrier(child)) return false;
     if (child.kind === E_KIND_IMAGE) return true;
+    if ((child.kind === E_KIND_VECTOR || child.kind === E_KIND_GROUP) && child.children && child.children.length) return false;
     const bounds = child.bounds;
     return !!(bounds && bounds.width && bounds.height);
   }
