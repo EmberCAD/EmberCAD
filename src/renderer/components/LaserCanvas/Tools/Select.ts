@@ -233,6 +233,7 @@ export default class Select {
         this.onAltSelect();
         return;
       }
+      if (hitItem.visible === false) return;
       if (!hitItem.opacity) return;
       if (textRoot) hitItem = textRoot;
       else if (hitItem.inGroup) hitItem = this.getParent(hitItem);

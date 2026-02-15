@@ -1075,7 +1075,7 @@ export default class Work extends View {
       const item = elements[uids[i]];
       if (!item || !item.uid || item.uid === SELECT) continue;
       if (isTextProxy(item) || isTextCarrier(item)) continue;
-      if (!this.isLayerTargetItem(item)) continue;
+      if (!this.isLayerOperationTarget(item)) continue;
       if (getLayerId(item) === layerId) fallback.push(item);
     }
     return fallback;
@@ -1095,6 +1095,16 @@ export default class Work extends View {
     const selectTool = this.canvas?.toolbox?.select;
     if (!selectTool || !selectTool.selectedItems || !selectTool.selectedItems.length) return false;
 
+    const hasVisibleOperationTarget = (item: any) => {
+      if (!item) return false;
+      if (this.isLayerOperationTarget(item) && item.visible !== false && item.opacity !== 0) return true;
+      const children = item.children || [];
+      for (let i = 0; i < children.length; i++) {
+        if (hasVisibleOperationTarget(children[i])) return true;
+      }
+      return false;
+    };
+
     const current = selectTool.selectedItems.slice();
     const keep = [];
     for (let i = 0; i < current.length; i++) {
@@ -1102,8 +1112,9 @@ export default class Work extends View {
       if (!raw) continue;
       const item = raw.uid ? this.canvas.elements[raw.uid] || raw : raw;
       if (!item) continue;
-      if (!this.isLayerTargetItem(item)) continue;
+      if (!this.isLayerOperationTarget(item)) continue;
       if (item.visible === false || item.opacity === 0) continue;
+      if (!hasVisibleOperationTarget(item)) continue;
       keep.push(item);
     }
 
@@ -1342,8 +1353,8 @@ export default class Work extends View {
     const isBetterCandidate = (prev: any, next: any) => {
       if (!prev) return true;
       if (!next) return false;
-      const prevDrawable = this.isLayerTargetItem(prev);
-      const nextDrawable = this.isLayerTargetItem(next);
+      const prevDrawable = this.isLayerOperationTarget(prev);
+      const nextDrawable = this.isLayerOperationTarget(next);
       return !prevDrawable && nextDrawable;
     };
     const collectItems = (item) => {
@@ -1379,12 +1390,13 @@ export default class Work extends View {
     const layerAllBuckets = {};
     for (let i = 0; i < allItems.length; i++) {
       const child = allItems[i];
-      if (!this.isLayerTargetItem(child) && !isTextCarrier(child) && !isTextRoot(child)) continue;
+      if (!this.isLayerOperationTarget(child) && !isTextCarrier(child) && !isTextRoot(child)) continue;
       this.ensureItemLayer(child);
       child.opacity = this.getElementOpacity(child);
       const layerId = getLayerId(child);
       if (!layerAllBuckets[layerId]) layerAllBuckets[layerId] = [];
       layerAllBuckets[layerId].push(child);
+      if (!this.isLayerBucketItem(child)) continue;
       if (!this.isListItem(child)) continue;
       if (!layerBuckets[layerId]) layerBuckets[layerId] = [];
       layerBuckets[layerId].push(child);
@@ -1453,13 +1465,23 @@ export default class Work extends View {
     return true;
   }
 
-  private isLayerTargetItem(child: any) {
+  private isLayerOperationTarget(child: any) {
     if (!child || !child.uid || child.uid === SELECT) return false;
     if (isTextCarrier(child)) return false;
+    if (isTextRoot(child)) return true;
     if (child.kind === E_KIND_IMAGE) return true;
-    if ((child.kind === E_KIND_VECTOR || child.kind === E_KIND_GROUP) && child.children && child.children.length) return false;
+    if ((child.kind === E_KIND_VECTOR || child.kind === E_KIND_GROUP) && child.children && child.children.length)
+      return true;
     const bounds = child.bounds;
     return !!(bounds && bounds.width && bounds.height);
+  }
+
+  private isLayerBucketItem(child: any) {
+    if (!this.isLayerOperationTarget(child)) return false;
+    if ((child.kind === E_KIND_VECTOR || child.kind === E_KIND_GROUP) && child.children && child.children.length) {
+      if (!isTextRoot(child)) return false;
+    }
+    return true;
   }
 
   private ensureItemLayer(child) {
