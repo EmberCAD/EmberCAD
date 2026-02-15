@@ -1,6 +1,6 @@
 {
   "name": "EmberCAD",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Cutting-Edge Laser Software",
   "main": "index.js",
   "scripts": {
