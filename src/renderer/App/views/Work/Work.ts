@@ -411,6 +411,71 @@ export default class Work extends View {
     return layerTool;
   }
 
+  private collectUsedLayerIdsFromScene() {
+    const usedLayerIds: string[] = [];
+    const seenLayerIds: Record<string, boolean> = {};
+    const seenItems: Record<string, boolean> = {};
+
+    const collect = (item: any) => {
+      if (!item) return;
+      if (item.uid === SELECT) return;
+
+      const uid = item.uid;
+      if (uid && seenItems[uid]) return;
+      if (uid) seenItems[uid] = true;
+
+      if (this.isLayerOperationTarget(item) || isTextRoot(item)) {
+        this.ensureItemLayer(item);
+        const layerId = getLayerId(item) || DEFAULT_LAYER_ID;
+        if (layerId && !seenLayerIds[layerId]) {
+          seenLayerIds[layerId] = true;
+          usedLayerIds.push(layerId);
+        }
+      }
+
+      const children = item.children || [];
+      for (let i = 0; i < children.length; i++) collect(children[i]);
+    };
+
+    const rootChildren = (this.canvas?.objectsLayer && this.canvas.objectsLayer.children) || [];
+    for (let i = 0; i < rootChildren.length; i++) collect(rootChildren[i]);
+
+    return usedLayerIds;
+  }
+
+  private normalizeLayerStateFromElements() {
+    const usedLayerIds = this.collectUsedLayerIdsFromScene();
+
+    const tools = this.getLayerToolsMap();
+    const nextTools: Record<string, any> = {};
+    for (let i = 0; i < usedLayerIds.length; i++) {
+      const layerId = usedLayerIds[i];
+      nextTools[layerId] = tools[layerId] ? tools[layerId] : this.createLayerTool(layerId);
+    }
+    this.canvas.objectsLayer.data.layerTools = nextTools;
+
+    const currentOrder = Array.isArray(this.layerOrder) ? this.layerOrder.slice() : [];
+    const usedSet: Record<string, boolean> = {};
+    for (let i = 0; i < usedLayerIds.length; i++) usedSet[usedLayerIds[i]] = true;
+
+    const ordered = currentOrder.filter((layerId) => usedSet[layerId]);
+    const orderedSet: Record<string, boolean> = {};
+    for (let i = 0; i < ordered.length; i++) orderedSet[ordered[i]] = true;
+
+    const missing = usedLayerIds
+      .filter((layerId) => !orderedSet[layerId])
+      .sort((a, b) => {
+        const la = getLayerById(a);
+        const lb = getLayerById(b);
+        const ia = la ? la.index : 0;
+        const ib = lb ? lb.index : 0;
+        return ia - ib;
+      });
+
+    this.layerOrder = [...ordered, ...missing];
+    this.saveLayerOrder();
+  }
+
   private applyLayerToolToItems(layerId: string, items: any[]) {
     const layerTool = this.getLayerTool(layerId);
     const seen = {};
@@ -575,11 +640,10 @@ export default class Work extends View {
 
   private handleHistory() {
     this.history.onApply = ({ selection }) => {
-      const items = (selection || [])
-        .map((uid) => this.canvas.elements[uid])
-        .filter((item) => item);
-
+      const selectionUids = Array.isArray(selection) ? selection.slice() : [];
+      this.normalizeLayerStateFromElements();
       this.updateLists();
+      const items = selectionUids.map((uid) => this.canvas.elements[uid]).filter((item) => item);
       this.selectElements(items);
     };
 
