@@ -1390,42 +1390,70 @@ export default class LaserCanvas {
     window[CURRENT_LAYER_FILL] = this.currentLayerFill;
   }
 
-  private resolveImportedColor(item: any) {
+  private normalizeImportedColor(color: any) {
+    if (!color) return null;
+    let value = null;
+    if (typeof color === 'string') value = color;
+    else if (typeof color.toCSS === 'function') value = color.toCSS();
+    if (!value) return null;
+    value = String(value).trim().toLowerCase();
+    if (!value || value === 'none' || value === 'transparent') return null;
+    if (value.indexOf('nan') > -1) return null;
+    if (value.startsWith('rgba')) {
+      const alpha = Number(value.replace(/rgba\(([^)]+)\)/i, '$1').split(',')[3]?.trim());
+      if (!Number.isNaN(alpha) && alpha <= 0) return null;
+    }
+    return value;
+  }
+
+  private resolveImportedStrokeColor(item: any) {
     if (!item) return null;
-    const toCss = (c: any) => {
-      if (!c) return null;
-      if (typeof c === 'string') return c;
-      if (typeof c.toCSS === 'function') return c.toCSS();
-      return null;
+    const metadataStroke = this.normalizeImportedColor(item?.data?.importStrokeColor);
+    if (metadataStroke) return metadataStroke;
+
+    const hadStroke = item?.data?.importHadStroke;
+    if (hadStroke) {
+      const dataStroke = this.normalizeImportedColor(item?.data?.strokeColor);
+      if (dataStroke) return dataStroke;
+    }
+
+    return this.normalizeImportedColor(item?.strokeColor);
+  }
+
+  private collectImportLayerTargets(root: any) {
+    const targets = [];
+    const seen = {};
+    const walk = (item) => {
+      if (!item) return;
+      const hasChildren = !!(item.children && item.children.length);
+      if (hasChildren) {
+        for (let i = 0; i < item.children.length; i++) walk(item.children[i]);
+      }
+      if (item === root) return;
+      if (item?.uid === SELECT) return;
+      if (isTextCarrier(item) || isTextRoot(item)) return;
+      if (!item?.uid || !item?.bounds || !item.bounds.width || !item.bounds.height) return;
+      if (item.clipMask) return;
+      if (seen[item.uid]) return;
+      seen[item.uid] = true;
+      targets.push(item);
     };
-    const cssColor =
-      item?.data?.strokeColor ||
-      item?.data?.fillColor ||
-      toCss(item?.strokeColor) ||
-      toCss(item?.fillColor);
-    return cssColor || null;
+    walk(root);
+    return targets;
   }
 
   private assignImportedLayers(root: any) {
     if (!root) return;
-    const drawable = [];
-    const walk = (item) => {
-      if (!item) return;
-      const hasUid = !!item.uid;
-      if (hasUid) {
-        drawable.push(item);
-      }
-      if (item.children && item.children.length) {
-        for (let i = 0; i < item.children.length; i++) walk(item.children[i]);
-      }
-    };
-    walk(root);
-    if (!drawable.length) return;
+    const targets = this.collectImportLayerTargets(root);
+    if (!targets.length) {
+      this.applyLayerToElement(root, this.currentLayerId, this.currentLayerFill, true);
+      return;
+    }
 
     const uniqueColors = {};
     let uniqueCount = 0;
-    for (let i = 0; i < drawable.length; i++) {
-      const color = this.resolveImportedColor(drawable[i]);
+    for (let i = 0; i < targets.length; i++) {
+      const color = this.resolveImportedStrokeColor(targets[i]);
       if (!color || uniqueColors[color]) continue;
       uniqueColors[color] = true;
       uniqueCount++;
@@ -1437,24 +1465,16 @@ export default class LaserCanvas {
       return;
     }
 
-    let colored = 0;
-    for (let i = 0; i < drawable.length; i++) {
-      const item = drawable[i];
-      const sourceColor = this.resolveImportedColor(item);
-      if (!sourceColor) continue;
+    this.applyLayerToElement(root, this.currentLayerId, this.currentLayerFill, false);
+    for (let i = 0; i < targets.length; i++) {
+      const item = targets[i];
+      const sourceColor = this.resolveImportedStrokeColor(item);
+      if (!sourceColor) {
+        this.applyLayerToElement(item, this.currentLayerId, this.currentLayerFill, false);
+        continue;
+      }
       const layer = findClosestLayer(sourceColor, false);
       this.applyLayerToElement(item, layer.id, layer.color, false);
-      colored++;
-    }
-
-    if (!colored) {
-      this.applyLayerToElement(root, this.currentLayerId, this.currentLayerFill, true);
-      return;
-    }
-
-    for (let i = 0; i < drawable.length; i++) {
-      const item = drawable[i];
-      if (!item?.data?.layerId) this.applyLayerToElement(item, this.currentLayerId, this.currentLayerFill, false);
     }
   }
 

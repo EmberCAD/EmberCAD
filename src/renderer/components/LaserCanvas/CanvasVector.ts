@@ -65,6 +65,22 @@ export default class CanvasVector extends CanvasElement {
 
   //////////////////////////////////////////////////////////////////////////////////////////
 
+  private normalizeImportedColor(color: any) {
+    if (!color) return null;
+    let value = null;
+    if (typeof color === 'string') value = color;
+    else if (typeof color.toCSS === 'function') value = color.toCSS();
+    if (!value) return null;
+    value = String(value).trim().toLowerCase();
+    if (!value || value === 'none' || value === 'transparent') return null;
+    if (value.indexOf('nan') > -1) return null;
+    if (value.startsWith('rgba')) {
+      const alpha = Number(value.replace(/rgba\(([^)]+)\)/i, '$1').split(',')[3]?.trim());
+      if (!Number.isNaN(alpha) && alpha <= 0) return null;
+    }
+    return value;
+  }
+
   private normalizeImportedSvgRoot(root: any) {
     if (!root || root.kind !== E_KIND_VECTOR || !root.userGroup) return;
     const children = root.children || [];
@@ -265,6 +281,14 @@ export default class CanvasVector extends CanvasElement {
       child.inGroup = true;
       child.kind = E_KIND_CURVE;
       child.uname = tr(E_KIND_CURVE) + ' ' + ++Counters.Curves;
+      if (!child.data) child.data = {};
+
+      const importStrokeColor = this.normalizeImportedColor(child.strokeColor);
+      child.data.importHadStroke = !!importStrokeColor;
+      if (importStrokeColor) {
+        child.data.importStrokeColor = importStrokeColor;
+        child.data.strokeColor = importStrokeColor;
+      }
 
       if (child.closed) {
         const area = Math.abs(child.area);
@@ -285,7 +309,6 @@ export default class CanvasVector extends CanvasElement {
         }
         child.strokeColor = child.fillColor;
         child.data.fillColor = colorIndex;
-        child.data.strokeColor = colorIndex;
 
         this.fillGroups[colorIndex].push(child);
       } else if (child.strokeColor) {
